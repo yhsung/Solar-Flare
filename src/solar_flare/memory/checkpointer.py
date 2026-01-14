@@ -13,8 +13,15 @@ from datetime import datetime
 from pathlib import Path
 
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.base import BaseCheckpointSaver
+
+# SqliteSaver is optional - may not be available in all langgraph versions
+try:
+    from langgraph.checkpoint.sqlite import SqliteSaver
+    SQLITE_AVAILABLE = True
+except ImportError:
+    SqliteSaver = None  # type: ignore
+    SQLITE_AVAILABLE = False
 from pydantic import BaseModel, Field
 
 
@@ -97,7 +104,12 @@ class SolarFlareCheckpointer:
         if self.config.backend == "memory":
             return MemorySaver()
         elif self.config.backend == "sqlite":
-            return SqliteSaver.from_conn_string(self.config.database_path)
+            if not SQLITE_AVAILABLE:
+                raise ImportError(
+                    "SQLite checkpoint backend is not available. "
+                    "Install langgraph-checkpoint or use backend='memory'."
+                )
+            return SqliteSaver.from_conn_string(self.config.database_path)  # type: ignore
         elif self.config.backend == "file":
             # File-based uses custom implementation
             return FileCheckpointSaver(self.config.persist_directory)

@@ -425,9 +425,10 @@ class StandardsVectorStore:
 
         context_parts = []
         for i, result in enumerate(results, 1):
+            part_str = f" Part {result['part']}" if result.get('part') else ''
             context_parts.append(
                 f"[Reference {i}] {result['title']} "
-                f"({result['standard']}{f' Part {result[\"part\"]}' if result.get('part') else ''})\n"
+                f"({result['standard']}{part_str})\n"
                 f"{result['content'][:500]}..."
             )
 

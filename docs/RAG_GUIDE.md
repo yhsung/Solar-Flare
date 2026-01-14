@@ -952,6 +952,316 @@ if __name__ == "__main__":
 
 ---
 
+## Multi-Store RAG System
+
+For advanced use cases, Solar-Flare provides a multi-store RAG system that manages separate vector stores for different document types. Each store can have different chunking strategies, embedding models, and metadata schemas.
+
+### Why Use Multi-Store RAG?
+
+Different document types have different characteristics:
+
+| Document Type | Change Frequency | Chunk Size | Use Case |
+|--------------|------------------|------------|----------|
+| **Standards** | Rarely | 500 (larger) | ISO 26262, ASPICE, GB/T 34590 |
+| **Internal Docs** | Occasionally | 600 (medium) | Design specs, APIs, hardware specs |
+| **Working Materials** | Frequently | 400 (smaller) | Meetings, emails, discussions |
+
+### Quick Start
+
+```python
+from solar_flare.memory import create_multi_store_rag
+
+# Create multi-store system with defaults
+rag = create_multi_store_rag()
+
+# Add documents to specific stores
+rag.add_text(
+    store_name="standards",
+    text="ISO 26262-4 specifies requirements for system level development...",
+    title="ISO 26262-4: System Level Development",
+    standard="ISO 26262",
+)
+
+rag.add_text(
+    store_name="internal",
+    text="The logging subsystem uses a lock-free ring buffer...",
+    title="Logging Subsystem Architecture",
+    standard="internal",
+)
+
+# Search across specific stores
+results = rag.search_all(
+    "system level safety requirements",
+    stores=["standards"],
+    top_k=3
+)
+
+# Search across all stores
+unified_results = rag.search_unified("safety mechanisms", top_k=5)
+```
+
+### Default Stores
+
+The `create_multi_store_rag()` factory creates three stores:
+
+| Store Name | Document Types | Chunk Size | Chunk Overlap |
+|------------|----------------|------------|---------------|
+| `standards` | ISO 26262, ASPICE, GB/T 34590 | 500 | 50 |
+| `internal` | design_spec, architecture, api, hardware | 600 | 100 |
+| `working` | meeting_notes, email_thread, discussion_notes, design_draft | 400 | 50 |
+
+### Custom Configuration
+
+```python
+from solar_flare.memory import (
+    MultiStoreRAG,
+    MultiStoreConfig,
+    StoreConfig,
+)
+
+# Define custom stores
+stores = {
+    "hardware": StoreConfig(
+        name="hardware",
+        document_types=["datasheet", "reference_manual"],
+        persist_directory="./data/hardware_store",
+        chunk_size=700,
+        chunk_overlap=100,
+        embedding_model="text-embedding-3-large",
+    ),
+    "standards": StoreConfig(
+        name="standards",
+        document_types=["ISO 26262", "ASPICE"],
+        persist_directory="./data/standards_store",
+        chunk_size=500,
+        chunk_overlap=50,
+    ),
+}
+
+config = MultiStoreConfig(
+    base_directory="./data/vector_stores",
+    stores=stores,
+)
+
+rag = MultiStoreRAG(config)
+```
+
+### Working Materials Ingestion
+
+The `WorkingMaterialsIngestor` provides batch ingestion from a directory structure:
+
+```python
+from solar_flare.memory import create_multi_store_rag, WorkingMaterialsIngestor
+from pathlib import Path
+
+rag = create_multi_store_rag()
+ingestor = WorkingMaterialsIngestor(rag, target_store="working")
+
+# Directory structure:
+# working_materials/
+# ├── meetings/          -> meeting_notes
+# ├── emails/            -> email_thread
+# ├── discussions/       -> discussion_notes
+# ├── drafts/            -> design_draft
+# └── reviews/           -> review_notes
+
+counts = ingestor.ingest_directory(Path("docs/working_materials"))
+
+print(f"Ingested: {counts}")
+# Output: {"meeting_notes": 5, "email_thread": 3, ...}
+```
+
+### Ingesting Individual Files
+
+```python
+# Ingest a single file
+ingestor.ingest_single_file(
+    file_path=Path("docs/design_decisions.txt"),
+    doc_type="design_draft",
+    title="Ring Buffer Overflow Policy Decision",
+)
+
+# Ingest text directly
+ingestor.ingest_text(
+    text="Meeting discussion about ASIL D requirements...",
+    title="Safety Review 2024-01-15",
+    doc_type="meeting_notes",
+    attendees=["Alice", "Bob", "Charlie"],
+)
+```
+
+### Cross-Store Queries
+
+```python
+# Search specific stores
+results = rag.search_all(
+    "ASIL-D ring buffer requirements",
+    stores=["standards", "internal"],
+    top_k=3
+)
+
+# Results grouped by store
+for store_name, items in results.items():
+    print(f"{store_name}:")
+    for item in items:
+        print(f"  - {item['title']}")
+```
+
+### Unified Search with Source Tracking
+
+```python
+# Get merged, ranked results from all stores
+unified = rag.search_unified("diagnostic coverage", top_k=5)
+
+for result in unified:
+    store = result.get("source_store")
+    title = result.get("title", "No title")
+    print(f"[{store}] {title}")
+```
+
+### Agent Context Building
+
+```python
+# Build unified context for agent prompts
+context = rag.retrieve_for_context(
+    query="lock-free ring buffer",
+    agent_type="embedded_designer",
+    asil_level="ASIL_D",
+    include_working_materials=True,
+)
+
+# Context includes:
+# - Standards context (ISO 26262 requirements)
+# - Internal context (design decisions)
+# - Working materials (meeting notes, emails)
+```
+
+### Store Management
+
+```python
+# List available stores
+stores = rag.list_stores()
+print(stores)  # ['standards', 'internal', 'working']
+
+# Get specific store
+standards_store = rag.get_store("standards")
+
+# Get statistics for all stores
+stats = rag.get_statistics()
+for store_name, store_stats in stats.items():
+    print(f"{store_name}: {store_stats['total_documents']} documents")
+
+# Save all stores
+rag.save_all()
+
+# Load all stores
+rag.load_all()
+```
+
+### Adding StandardDocument Objects
+
+```python
+from solar_flare.memory import StandardDocument
+
+doc = StandardDocument(
+    title="ISO 26262-6: Software Level Requirements",
+    standard="ISO 26262",
+    part="6",
+    version="2018",
+    content="Part 6 specifies requirements for software development...",
+    metadata={"language": "en", "domain": "functional_safety"},
+)
+
+rag.add_document("standards", doc)
+```
+
+### Hardware Specifications Store
+
+For hardware specifications and datasheets, use a dedicated store with larger chunks:
+
+```python
+hardware_config = StoreConfig(
+    name="hardware",
+    document_types=["datasheet", "reference_manual", "user_guide"],
+    persist_directory="./data/hardware_store",
+    chunk_size=700,  # Larger for technical specs
+    chunk_overlap=100,
+)
+
+# Add to multi-store config
+config = MultiStoreConfig(
+    base_directory="./data/vector_stores",
+    stores={
+        "hardware": hardware_config,
+        **DEFAULT_STORES,  # Include default stores
+    },
+)
+
+rag = MultiStoreRAG(config)
+```
+
+### Best Practices
+
+1. **Choose appropriate chunk sizes**:
+   - Standards: 500 (formal, structured content)
+   - Internal docs: 600-700 (technical details)
+   - Working materials: 400 (conversational, changeable)
+
+2. **Use separate stores for different update frequencies**:
+   - Re-index only the changed store
+   - Avoid full rebuilds when one document type changes
+
+3. **Leverage metadata filtering**:
+   - Tag documents with `document_type`, `date`, `language`
+   - Use metadata for targeted searches
+
+4. **Plan for multilingual support**:
+   - Use appropriate embedding models per store
+   - Chinese-only store: `bge-large-zh-v1.5`
+   - Mixed content: `text-embedding-3-large`
+
+### Example: Complete Workflow
+
+```python
+from solar_flare.memory import create_multi_store_rag, WorkingMaterialsIngestor
+from pathlib import Path
+
+# Initialize multi-store system
+rag = create_multi_store_rag()
+ingestor = WorkingMaterialsIngestor(rag)
+
+# Ingest working materials
+ingestor.ingest_directory(Path("docs/working_materials"))
+
+# Add internal design document
+rag.add_text(
+    store_name="internal",
+    text=open("docs/logging_architecture.md").read(),
+    title="Logging Subsystem Architecture",
+    standard="internal",
+    document_type="architecture",
+)
+
+# Cross-reference design decisions with standards
+results = rag.search_all(
+    "overflow handling for ASIL D",
+    stores=["standards", "working"],
+    top_k=3
+)
+
+# Build context for design review
+context = rag.retrieve_for_context(
+    query="ring buffer overflow policy",
+    agent_type="design_reviewer",
+    asil_level="ASIL_D",
+)
+
+# Save for future use
+rag.save_all()
+```
+
+---
+
 ## Appendix: Pre-loaded Standards
 
 Solar-Flare includes the following pre-loaded sample documents:

@@ -259,13 +259,169 @@ context = rag.retrieve_for_context(
 )
 ```
 
+## Implementation Phases
+
+### Phase 1: Core Configuration Models
+**File**: `src/solar_flare/memory/multi_store.py`
+
+Create configuration classes that extend the existing `VectorStoreConfig` pattern:
+
+```python
+class StoreConfig(BaseModel):
+    """Configuration for a single vector store."""
+    name: str
+    document_types: List[str]
+    persist_directory: str
+    chunk_size: int = 500
+    chunk_overlap: int = 50
+    embedding_model: str = "text-embedding-3-small"
+    use_local_embeddings: bool = False
+    store_type: Literal["faiss", "chroma"] = "faiss"
+
+class MultiStoreConfig(BaseModel):
+    """Configuration for multiple vector stores."""
+    base_directory: str = "./data/vector_stores"
+    stores: Dict[str, StoreConfig] = {}
+```
+
+### Phase 2: MultiStoreRAG Class
+**File**: `src/solar_flare/memory/multi_store.py`
+
+Key implementation details:
+- Reuses existing `StandardsVectorStore` for each store
+- Manages `Dict[str, StandardsVectorStore]` internally
+- Provides unified search across stores
+
+```python
+class MultiStoreRAG:
+    def __init__(self, config: MultiStoreConfig):
+        self.config = config
+        self._stores: Dict[str, StandardsVectorStore] = {}
+        self._initialize_stores()
+
+    def _initialize_stores(self):
+        """Initialize each store using StandardsVectorStore."""
+        for name, store_config in self.config.stores.items():
+            vector_config = VectorStoreConfig(
+                store_type=store_config.store_type,
+                persist_directory=store_config.persist_directory,
+                embedding_model=store_config.embedding_model,
+                use_local_embeddings=store_config.use_local_embeddings,
+                chunk_size=store_config.chunk_size,
+                chunk_overlap=store_config.chunk_overlap,
+            )
+            # Load existing or create new
+            self._stores[name] = StandardsVectorStore(vector_config)
+
+    def add_document(self, store_name: str, document: StandardDocument):
+        """Add document to specific store."""
+
+    def add_text(self, store_name: str, text: str, **kwargs):
+        """Add text to specific store with chunking."""
+
+    def search_all(self, query: str, top_k: int = 3,
+                   stores: Optional[List[str]] = None) -> Dict[str, List[Dict]]:
+        """Search across stores, return grouped results."""
+
+    def search_unified(self, query: str, top_k: int = 5,
+                      stores: Optional[List[str]] = None) -> List[Dict]:
+        """Search across stores, return merged ranked results."""
+
+    def retrieve_for_context(self, query: str, agent_type: str,
+                            asil_level: Optional[str] = None) -> str:
+        """Build unified context for agent prompts."""
+
+    def save_all(self):
+        """Persist all stores."""
+
+    def load_all(self):
+        """Load all stores from disk."""
+```
+
+### Phase 3: Working Materials Ingestor
+**File**: `src/solar_flare/memory/ingestor.py`
+
+Directory structure expected:
+```
+working_materials/
+├── meetings/          -> document_type: "meeting_notes"
+├── emails/            -> document_type: "email_thread"
+├── discussions/       -> document_type: "discussion_notes"
+├── drafts/            -> document_type: "design_draft"
+└── reviews/           -> document_type: "review_notes"
+```
+
+```python
+class WorkingMaterialsIngestor:
+    def __init__(self, multi_store: MultiStoreRAG):
+        self.multi_store = multi_store
+        self.dir_type_map = {
+            "meetings": "meeting_notes",
+            "emails": "email_thread",
+            "discussions": "discussion_notes",
+            "drafts": "design_draft",
+            "reviews": "review_notes",
+        }
+
+    def ingest_directory(self, root_dir: Path) -> Dict[str, int]:
+        """Scan and ingest, return counts by type."""
+
+    def _detect_document_type(self, path: Path) -> str:
+        """Detect type from directory name."""
+
+    def _extract_metadata(self, path: Path) -> Dict[str, Any]:
+        """Extract date from filename, attendees from content, etc."""
+```
+
+### Phase 4: Factory Function
+**File**: `src/solar_flare/memory/multi_store.py`
+
+```python
+def create_multi_store_rag(
+    base_directory: str = "./data/vector_stores",
+    embedding_model: str = "text-embedding-3-small",
+    use_local_embeddings: bool = False,
+) -> MultiStoreRAG:
+    """
+    Create MultiStoreRAG with defaults optimized for Solar-Flare.
+
+    Stores:
+    - standards: ISO 26262, ASPICE, GB/T 34590 (chunk=500, overlap=50)
+    - internal: Design specs, APIs, hardware (chunk=600, overlap=100)
+    - working: Meetings, emails, discussions (chunk=400, overlap=50)
+    """
+```
+
+### Phase 5: Update Module Exports
+**File**: `src/solar_flare/memory/__init__.py`
+
+Add new exports while keeping existing ones.
+
+### Phase 6: Tests and Examples
+
+**Unit tests**: `tests/unit/test_multi_store.py`
+**Example script**: `examples/multi_store_usage.py`
+
+## Critical Files Reference
+
+| File | Purpose |
+|------|---------|
+| `src/solar_flare/memory/vector_store.py:1` | Existing `StandardsVectorStore` to reuse |
+| `src/solar_flare/memory/vector_store.py:45` | `VectorStoreConfig` pattern to follow |
+| `src/solar_flare/memory/vector_store.py:85` | `StandardDocument` model for docs |
+| `src/solar_flare/agents/base.py:164` | `AgentRegistry` pattern for reference |
+| `src/solar_flare/memory/__init__.py:1` | Module exports to update |
+
 ## Verification Checklist
 
-- [ ] `MultiStoreRAG` class implemented
-- [ ] `StoreConfig` and `MultiStoreConfig` models
-- [ ] `create_multi_store_rag()` factory function
-- [ ] `WorkingMaterialsIngestor` for batch ingestion
+- [ ] `StoreConfig` and `MultiStoreConfig` models created
+- [ ] `MultiStoreRAG` class with `_initialize_stores()` using existing `StandardsVectorStore`
+- [ ] `search_all()` returns Dict[str, List[Dict]] grouped by store
+- [ ] `search_unified()` merges and re-ranks results across stores
+- [ ] `retrieve_for_context()` formats output for agent prompts
+- [ ] `WorkingMaterialsIngestor` with directory scanning
+- [ ] `create_multi_store_rag()` factory with default configurations
 - [ ] `__init__.py` exports updated
-- [ ] Unit tests pass
-- [ ] Example script works
-- [ ] Documentation updated in RAG_GUIDE.md
+- [ ] Unit tests in `tests/unit/test_multi_store.py`
+- [ ] Example script in `examples/multi_store_usage.py`
+- [ ] RAG_GUIDE.md updated with multi-store section
