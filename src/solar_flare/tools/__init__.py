@@ -8,6 +8,8 @@ from solar_flare.tools.analysis_tools import (
     cross_reference_requirements,
     calculate_cpu_overhead,
     generate_memory_layout,
+    build_traceability_matrix,
+    generate_fmea,
 )
 
 __all__ = [
@@ -19,4 +21,6 @@ __all__ = [
     "cross_reference_requirements",
     "calculate_cpu_overhead",
     "generate_memory_layout",
+    "build_traceability_matrix",
+    "generate_fmea",
 ]

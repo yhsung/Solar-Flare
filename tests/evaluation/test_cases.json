@@ -1,0 +1,201 @@
+{
+  "version": "1.0",
+  "description": "Test cases for Solar-Flare multi-agent system evaluation",
+  "test_cases": [
+    {
+      "id": "tc-001",
+      "name": "Basic Ring Buffer Design",
+      "description": "Design a basic ring buffer for logging",
+      "user_request": "Design a lock-free ring buffer for logging on a Cortex-R5",
+      "expected_agents": ["embedded_designer"],
+      "expected_asil_level": null,
+      "expected_components": ["ring buffer"],
+      "required_keywords": ["ring buffer", "lock-free", "head", "tail"],
+      "forbidden_keywords": ["malloc", "dynamic allocation"],
+      "evaluation_criteria": {}
+    },
+    {
+      "id": "tc-002",
+      "name": "ASIL-D Compliance Analysis",
+      "description": "Analyze a design for ASIL-D compliance",
+      "user_request": "Analyze this ring buffer design for ISO 26262 ASIL-D compliance",
+      "expected_agents": ["iso_26262_analyzer"],
+      "expected_asil_level": "ASIL_D",
+      "expected_components": [],
+      "required_keywords": ["ASIL D", "safety", "diagnostic"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {
+        "min_diagnostic_coverage_mentioned": true
+      }
+    },
+    {
+      "id": "tc-003",
+      "name": "DMA Transport Design",
+      "description": "Design DMA-based logging transport",
+      "user_request": "Design a DMA-based logging transport with zero-copy",
+      "expected_agents": ["embedded_designer"],
+      "expected_asil_level": null,
+      "expected_components": ["DMA", "transport"],
+      "required_keywords": ["DMA", "zero-copy", "interrupt"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {}
+    },
+    {
+      "id": "tc-004",
+      "name": "ASPICE Level 3 Assessment",
+      "description": "Assess ASPICE capability level 3",
+      "user_request": "Assess the ASPICE capability level for this design process",
+      "expected_agents": ["aspice_assessor"],
+      "expected_asil_level": null,
+      "expected_components": [],
+      "required_keywords": ["ASPICE", "capability level", "process"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {
+        "target_capability_level": 3
+      }
+    },
+    {
+      "id": "tc-005",
+      "name": "Complete Design with Review",
+      "description": "Full design workflow with design review",
+      "user_request": "Design a complete logging subsystem for a brake-by-wire system:\n- Safety Level: ASIL-D\n- Platform: Infineon AURIX TC397\n- RTOS: AUTOSAR OS\n- ASPICE Target: Level 3",
+      "expected_agents": [
+        "iso_26262_analyzer",
+        "embedded_designer",
+        "aspice_assessor",
+        "design_reviewer"
+      ],
+      "expected_asil_level": "ASIL_D",
+      "expected_components": ["ring buffer", "DMA", "transport"],
+      "required_keywords": ["ring buffer", "DMA", "ASIL D", "safety"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {}
+    },
+    {
+      "id": "tc-006",
+      "name": "Multi-Core Synchronization",
+      "description": "Design for multi-core synchronization",
+      "user_request": "Design a logging service for multi-core with synchronization",
+      "expected_agents": ["embedded_designer"],
+      "expected_asil_level": null,
+      "expected_components": [],
+      "required_keywords": ["multi-core", "synchronization", "atomic", "timer"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {}
+    },
+    {
+      "id": "tc-007",
+      "name": "Hardware Constraints Validation",
+      "description": "Validate hardware constraints are respected",
+      "user_request": "Design a logging service with strict hardware constraints:\n- Mailbox: 64 bytes\n- DMA: 64KB burst\n- CPU: <=3%\n- Bandwidth: <=10 MB/s",
+      "expected_agents": ["embedded_designer", "design_reviewer"],
+      "expected_asil_level": null,
+      "expected_components": [],
+      "required_keywords": ["mailbox", "DMA", "CPU", "bandwidth"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {
+        "constraints_validated": true
+      }
+    },
+    {
+      "id": "tc-008",
+      "name": "ASIL-B Design",
+      "description": "Design for ASIL-B requirements",
+      "user_request": "Design a logging buffer for ASIL-B requirements",
+      "expected_agents": ["iso_26262_analyzer", "embedded_designer"],
+      "expected_asil_level": "ASIL_B",
+      "expected_components": ["ring buffer"],
+      "required_keywords": ["ASIL B", "safety"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {}
+    },
+    {
+      "id": "tc-009",
+      "name": "ISO 26262 Part 4 Compliance",
+      "description": "System level design compliance",
+      "user_request": "Design a logging system compliant with ISO 26262-4 system level requirements",
+      "expected_agents": ["iso_26262_analyzer", "embedded_designer"],
+      "expected_asil_level": null,
+      "expected_components": [],
+      "required_keywords": ["system", "technical safety", "safe state", "FTTI"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {}
+    },
+    {
+      "id": "tc-010",
+      "name": "ASPICE SWE.1 Requirements",
+      "description": "Requirements elicitation process",
+      "user_request": "Assess the requirements elicitation process for logging subsystem",
+      "expected_agents": ["aspice_assessor"],
+      "expected_asil_level": null,
+      "expected_components": [],
+      "required_keywords": ["requirements", "stakeholder", "traceability"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {
+        "aspice_process": "SWE.1"
+      }
+    },
+    {
+      "id": "tc-011",
+      "name": "AURIX TC397 Platform",
+      "description": "Design for specific AURIX platform",
+      "user_request": "Design logging for Infineon AURIX TC397 TriCore platform",
+      "expected_agents": ["embedded_designer"],
+      "expected_asil_level": null,
+      "expected_components": [],
+      "required_keywords": ["AURIX", "TriCore", "Infineon"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {}
+    },
+    {
+      "id": "tc-012",
+      "name": "AUTOSAR OS Integration",
+      "description": "Design with AUTOSAR OS",
+      "user_request": "Design a logging service for AUTOSAR OS with task synchronization",
+      "expected_agents": ["embedded_designer"],
+      "expected_asil_level": null,
+      "expected_components": [],
+      "required_keywords": ["AUTOSAR", "task", "synchronization", "ISR"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {}
+    },
+    {
+      "id": "tc-013",
+      "name": "QM Level Design",
+      "description": "Design for QM (Quality Management) level",
+      "user_request": "Design a diagnostic logging buffer with no safety requirements",
+      "expected_agents": ["embedded_designer"],
+      "expected_asil_level": "QM",
+      "expected_components": ["ring buffer"],
+      "required_keywords": ["diagnostic", "logging"],
+      "forbidden_keywords": ["safety", "ASIL"],
+      "evaluation_criteria": {}
+    },
+    {
+      "id": "tc-014",
+      "name": "Design Review Gap Analysis",
+      "description": "Identify gaps in existing design",
+      "user_request": "Review this ring buffer design for compliance gaps:\n- Lock-free with atomic indices\n- Single producer, single consumer\n- No overflow handling",
+      "expected_agents": ["design_reviewer"],
+      "expected_asil_level": null,
+      "expected_components": [],
+      "required_keywords": ["gap", "missing", "violation"],
+      "forbidden_keywords": [],
+      "evaluation_criteria": {
+        "gaps_identified": true
+      }
+    },
+    {
+      "id": "tc-015",
+      "name": "Overflow Policy Design",
+      "description": "Design with specific overflow policy",
+      "user_request": "Design a ring buffer with LOG_POLICY_STOP for post-mortem analysis",
+      "expected_agents": ["embedded_designer"],
+      "expected_asil_level": null,
+      "expected_components": ["ring buffer"],
+      "required_keywords": ["overflow", "stop", "post-mortem"],
+      "forbidden_keywords": ["overwrite", "circular"],
+      "evaluation_criteria": {}
+    }
+  ]
+}
