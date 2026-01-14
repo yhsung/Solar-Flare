@@ -346,21 +346,42 @@ constraints = HardwareConstraints(
 )
 ```
 
-## Development
+## RAG (Retrieval-Augmented Generation)
 
-### Project Structure
+Solar-Flare includes built-in RAG capabilities for retrieving relevant ISO 26262 and ASPICE standards during design and analysis.
+
+**Quick Start:**
+
+```python
+from solar_flare.memory import create_default_vector_store
+
+# Create vector store with pre-loaded standards
+store = create_default_vector_store()
+
+# Search for relevant content
+results = store.search("ASIL D diagnostic coverage requirements", top_k=3)
+```
+
+See [RAG_GUIDE.md](docs/RAG_GUIDE.md) for detailed documentation on:
+- Document preparation and ingestion
+- Vector store configuration
+- Integration with agents
+- Best practices and troubleshooting
+
+## Development
 
 ```
 Solar-Flare/
 ├── src/solar_flare/
 │   ├── agents/          # Agent implementations
 │   ├── graph/           # LangGraph workflow and state
+│   ├── memory/          # Vector store, checkpointing, conversation
 │   ├── prompts/         # Agent prompt templates
 │   ├── tools/           # Tool integrations
 │   └── utils/           # Utilities
 ├── examples/            # Usage examples
 ├── tests/               # Test suite
-├── docs/                # Documentation
+├── docs/                # Documentation (RAG guide, status reports)
 └── pyproject.toml       # Project configuration
 ```
 
