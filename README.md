@@ -367,6 +367,7 @@ See [RAG_GUIDE.md](docs/RAG_GUIDE.md) for detailed documentation on:
 - Vector store configuration
 - Integration with agents
 - Best practices and troubleshooting
+- **Multilingual support** (Mandarin/Chinese, cross-language retrieval)
 
 ## Development
 

@@ -624,6 +624,334 @@ for standard, results in by_standard.items():
 
 ---
 
+## Multilingual Support (Mandarin/Chinese)
+
+Solar-Flare's RAG system supports multilingual document ingestion and retrieval, including Chinese (Mandarin) language content.
+
+### Chinese Embedding Models
+
+| Model | Type | Provider | Language Support | API Required |
+|-------|------|----------|------------------|--------------|
+| `text-embedding-3-small` | OpenAI | OpenAI | 100+ languages including Chinese | Yes |
+| `text-embedding-3-large` | OpenAI | OpenAI | 100+ languages including Chinese | Yes |
+| `text-embedding-ada-002` | OpenAI | OpenAI | Multilingual | Yes |
+| `paraphrase-multilingual-MiniLM-L12-v2` | Local | Sentence Transformers | 50+ languages | No |
+| `distiluse-base-multilingual-cased-v1` | Local | Sentence Transformers | 50+ languages | No |
+| `bge-large-zh-v1.5` | Local | BAAI (BAAI General Embedding) | Optimized for Chinese | No |
+
+### Configuration for Chinese Documents
+
+```python
+from solar_flare.memory import StandardsVectorStore, VectorStoreConfig
+
+# Option 1: Use OpenAI multilingual embeddings
+config_openai = VectorStoreConfig(
+    embedding_model="text-embedding-3-large",  # Excellent Chinese support
+    store_type="faiss",
+    persist_directory="./data/vector_store_zh",
+)
+
+# Option 2: Use Chinese-optimized local embeddings
+config_local_zh = VectorStoreConfig(
+    embedding_model="BAAI/bge-large-zh-v1.5",  # Chinese-optimized
+    use_local_embeddings=True,
+    store_type="faiss",
+    persist_directory="./data/vector_store_zh_local",
+)
+
+# Option 3: Use multilingual local embeddings
+config_multilingual = VectorStoreConfig(
+    embedding_model="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    use_local_embeddings=True,
+    store_type="faiss",
+    persist_directory="./data/vector_store_multilingual",
+)
+
+store = StandardsVectorStore(config_openai)
+```
+
+### Installing Local Chinese Embedding Models
+
+```bash
+# For BGE Chinese embeddings (recommended for Chinese-only content)
+pip install sentence-transformers
+pip install FlagOpen/flagembedding
+
+# For multilingual sentence transformers
+pip install sentence-transformers
+```
+
+### Ingesting Chinese Documents
+
+```python
+from solar_flare.memory import StandardsVectorStore, StandardDocument
+
+store = StandardsVectorStore(config_openai)
+
+# Add Chinese GB/T standards (Chinese automotive safety standards)
+doc_gb = StandardDocument(
+    title="GB/T 34590: 道路车辆 功能安全",
+    standard="GB/T 34590",  # Chinese equivalent of ISO 26262
+    part="4",
+    version="2022",
+    content="""
+    GB/T 34590-4: 道路车辆 功能安全 第4部分：系统层面产品开发
+
+    本部分规定了车辆系统层面产品开发的要求，包括：
+    - 技术安全概念（Technical Safety Concept）
+    - 系统安全规范（System Safety Specifications）
+    - 硬件软件接口规范（HSR）
+    - 集成与测试（Integration and Testing）
+    """,
+    metadata={
+        "language": "zh",
+        "keywords": ["功能安全", "ASIL", "系统开发", "技术安全概念"],
+        "domain": "functional_safety",
+    }
+)
+
+store.add_documents([doc_gb])
+store.save()
+```
+
+### Cross-Language Retrieval
+
+```python
+# Search in English, retrieve Chinese documents
+results_en = store.search(
+    query="ASIL D requirements for automotive safety",
+    top_k=3
+)
+
+# Search in Chinese, retrieve Chinese documents
+results_zh = store.search(
+    query="ASIL D 汽车功能安全要求",
+    top_k=3
+)
+
+# Both queries will find relevant Chinese content
+for result in results_zh:
+    print(f"{result['title']}: {result['content'][:100]}...")
+```
+
+### Bilingual Standards Integration
+
+```python
+from solar_flare.memory import StandardsVectorStore, VectorStoreConfig
+
+config = VectorStoreConfig(
+    embedding_model="text-embedding-3-large",  # Best for bilingual
+    chunk_size=500,
+    chunk_overlap=50,
+)
+
+store = StandardsVectorStore(config)
+
+# Add both ISO 26262 (English) and GB/T 34590 (Chinese) standards
+documents = [
+    StandardDocument(
+        title="ISO 26262-4: System Level Product Development",
+        standard="ISO 26262",
+        part="4",
+        version="2018",
+        content="ISO 26262-4 specifies requirements for system level development...",
+        metadata={"language": "en", "domain": "functional_safety"}
+    ),
+    StandardDocument(
+        title="GB/T 34590-4: 系统层面产品开发",
+        standard="GB/T 34590",
+        part="4",
+        version="2022",
+        content="GB/T 34590-4 规定了系统层面产品开发的要求...",
+        metadata={"language": "zh", "domain": "functional_safety"}
+    ),
+]
+
+store.add_documents(documents)
+
+# Cross-language search: Query in English, find both
+results = store.search("technical safety concept development", top_k=5)
+
+for result in results:
+    lang = result.get("metadata", {}).get("language", "unknown")
+    print(f"[{lang}] {result['title']}")
+```
+
+### Language-Specific Chunking
+
+```python
+def add_chinese_chunks(store: StandardsVectorStore, text: str, title: str):
+    """Add Chinese text with appropriate chunking for CJK characters."""
+    # Chinese texts often need smaller chunks due to character density
+    store.add_text_chunks(
+        text=text,
+        title=title,
+        standard="GB/T 34590",
+        metadata={"language": "zh"},
+        chunk_size=400,   # Slightly smaller for Chinese
+        chunk_overlap=50,
+    )
+
+def add_english_chunks(store: StandardsVectorStore, text: str, title: str):
+    """Add English text with standard chunking."""
+    store.add_text_chunks(
+        text=text,
+        title=title,
+        standard="ISO 26262",
+        metadata={"language": "en"},
+        chunk_size=500,
+        chunk_overlap=50,
+    )
+```
+
+### Filtering by Language
+
+```python
+# Search only Chinese documents
+results_zh = store.search(
+    query="功能安全 验证要求",
+    filter_metadata={"language": "zh"},
+    top_k=3
+)
+
+# Search only English documents
+results_en = store.search(
+    query="functional safety verification requirements",
+    filter_metadata={"language": "en"},
+    top_k=3
+)
+```
+
+### Multilingual Agent Context
+
+```python
+# Get RAG context for Chinese-speaking agents
+context_zh = store.retrieve_for_context(
+    query="锁机制在多核系统中的应用",
+    agent_type="embedded_designer",
+    asil_level="ASIL_D",
+    language="zh"
+)
+
+# Get bilingual context
+context_bilingual = store.retrieve_for_context(
+    query="lock-free ring buffer for multi-core systems / 多核系统无锁环形缓冲区",
+    agent_type="embedded_designer",
+)
+```
+
+### Best Practices for Chinese RAG
+
+1. **Use Appropriate Embeddings**:
+   - For Chinese-only: `bge-large-zh-v1.5` (best performance)
+   - For mixed content: `text-embedding-3-large` (OpenAI)
+   - For multilingual: `paraphrase-multilingual-MiniLM-L12-v2`
+
+2. **Adjust Chunking**:
+   - Chinese texts are more information-dense: use smaller chunks (400-500)
+   - Preserve character boundaries: don't split in the middle of words
+
+3. **Metadata**:
+   - Always tag documents with `language` metadata
+   - Include both English and Chinese keywords for discoverability
+
+4. **Search Strategy**:
+   - Use language-specific queries for better precision
+   - Consider adding translation layer for cross-language search
+
+### Example: Complete Chinese RAG Workflow
+
+```python
+"""
+Complete workflow for ingesting and searching Chinese automotive standards.
+"""
+import asyncio
+from pathlib import Path
+from solar_flare.memory import (
+    StandardsVectorStore,
+    VectorStoreConfig,
+    StandardDocument,
+)
+
+async def ingest_chinese_standards():
+    """Ingest Chinese GB/T automotive safety standards."""
+
+    # Configure vector store for Chinese content
+    config = VectorStoreConfig(
+        embedding_model="text-embedding-3-large",
+        store_type="faiss",
+        persist_directory="./data/vector_store_zh",
+        chunk_size=450,  # Optimized for Chinese text
+        chunk_overlap=50,
+    )
+
+    store = StandardsVectorStore(config)
+
+    # Load Chinese standards documents
+    gb_standards = [
+        {
+            "file": "standards/gb/gbt_34590_part1.txt",
+            "title": "GB/T 34590-1: 词汇",
+            "part": "1",
+            "keywords": ["术语", "定义", "ASIL", "安全目标"]
+        },
+        {
+            "file": "standards/gb/gbt_34590_part4.txt",
+            "title": "GB/T 34590-4: 系统层面产品开发",
+            "part": "4",
+            "keywords": ["系统开发", "技术安全概念", "硬件软件接口"]
+        },
+        {
+            "file": "standards/gb/gbt_34590_part6.txt",
+            "title": "GB/T 34590-6: 软件层面产品开发",
+            "part": "6",
+            "keywords": ["软件开发", "编码规范", "单元测试"]
+        },
+    ]
+
+    for std_info in gb_standards:
+        file_path = Path(std_info["file"])
+
+        if file_path.exists():
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            store.add_text_chunks(
+                text=content,
+                title=std_info["title"],
+                standard="GB/T 34590",
+                metadata={
+                    "part": std_info["part"],
+                    "version": "2022",
+                    "language": "zh",
+                    "keywords": std_info["keywords"],
+                }
+            )
+            print(f"Ingested: {std_info['title']}")
+
+    # Save vector store
+    store.save()
+
+    # Print statistics
+    stats = store.get_statistics()
+    print(f"\nIngestion complete:")
+    print(f"  Total documents: {stats['total_documents']}")
+    print(f"  Store type: {stats['store_type']}")
+
+    # Test search
+    print("\n=== Testing Chinese Search ===")
+    results = store.search("ASIL D 软件验证要求", top_k=3)
+
+    for i, result in enumerate(results, 1):
+        print(f"\n[{i}] {result['title']}")
+        print(f"    {result['content'][:150]}...")
+
+if __name__ == "__main__":
+    asyncio.run(ingest_chinese_standards())
+```
+
+---
+
 ## Appendix: Pre-loaded Standards
 
 Solar-Flare includes the following pre-loaded sample documents:
