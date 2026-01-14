@@ -1,0 +1,34 @@
+{
+  "tools": [
+    {
+      "name": "tavily_web_search",
+      "mcp_server_url": "https://tools.langchain.com",
+      "mcp_server_name": "Agent Builder",
+      "display_name": "tavily_web_search"
+    },
+    {
+      "name": "read_url_content",
+      "mcp_server_url": "https://tools.langchain.com",
+      "mcp_server_name": "Agent Builder",
+      "display_name": "read_url_content"
+    },
+    {
+      "name": "github_get_file",
+      "mcp_server_url": "https://tools.langchain.com",
+      "mcp_server_name": "Agent Builder",
+      "display_name": "github_get_file"
+    },
+    {
+      "name": "github_list_directory",
+      "mcp_server_url": "https://tools.langchain.com",
+      "mcp_server_name": "Agent Builder",
+      "display_name": "github_list_directory"
+    }
+  ],
+  "interrupt_config": {
+    "https://tools.langchain.com::tavily_web_search::Agent Builder": false,
+    "https://tools.langchain.com::read_url_content::Agent Builder": false,
+    "https://tools.langchain.com::github_get_file::Agent Builder": false,
+    "https://tools.langchain.com::github_list_directory::Agent Builder": false
+  }
+}

@@ -1,0 +1,1 @@
+"""Solar-Flare test suite."""
