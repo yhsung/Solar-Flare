@@ -36,7 +36,19 @@ from solar_flare.memory.multi_store import (
 )
 from solar_flare.memory.ingestor import (
     WorkingMaterialsIngestor,
+    IngestionResult as LegacyIngestionResult,
+)
+from solar_flare.memory.ingestion import (
+    IngestionOrchestrator,
+    IngestionConfig,
+    LocalFSConfig,
+    SMBConfig,
+    ConfluenceConfig,
+    SharePointConfig,
+    VersionStore,
     IngestionResult,
+    IngestionProgress,
+    create_ingestion_orchestrator,
 )
 
 __all__ = [
@@ -62,7 +74,18 @@ __all__ = [
     "MultiStoreRAG",
     "DEFAULT_STORES",
     "create_multi_store_rag",
-    # Ingestion
+    # Legacy Ingestion
     "WorkingMaterialsIngestor",
+    "LegacyIngestionResult",
+    # Multi-Source Ingestion
+    "IngestionOrchestrator",
+    "IngestionConfig",
+    "LocalFSConfig",
+    "SMBConfig",
+    "ConfluenceConfig",
+    "SharePointConfig",
+    "VersionStore",
     "IngestionResult",
+    "IngestionProgress",
+    "create_ingestion_orchestrator",
 ]
