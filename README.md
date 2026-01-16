@@ -21,7 +21,9 @@ The system enforces strict hardware constraints typical of automotive MCUs:
 ### Prerequisites
 
 - Python 3.10 or higher
-- API keys for LLM providers (OpenAI or Anthropic)
+- LLM provider (choose one):
+  - Cloud: API keys for OpenAI or Anthropic
+  - Local: Ollama or LM Studio installed
 - Tavily API key for web search (optional, for research capabilities)
 
 ### Install from Source
@@ -40,10 +42,17 @@ pip install -e .
 Create a `.env` file in the project root:
 
 ```bash
-# Required: Choose one LLM provider
+# Cloud LLM Providers (choose one)
 OPENAI_API_KEY=sk-...
 # or
 ANTHROPIC_API_KEY=sk-ant-...
+
+# Local LLM Providers (alternative to cloud)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1
+# or
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+LMSTUDIO_MODEL=local-model
 
 # Optional: For web search capabilities
 TAVILY_API_KEY=tvly-...
@@ -88,16 +97,67 @@ if __name__ == "__main__":
 
 ### Using Different LLM Providers
 
+Solar-Flare supports multiple LLM providers through a unified factory function:
+
+```python
+from solar_flare import create_llm, LLMProvider
+
+# OpenAI (default)
+llm = create_llm()
+
+# OpenAI with specific model
+llm = create_llm(provider="openai", model="gpt-4o", temperature=0.3)
+
+# Anthropic Claude
+llm = create_llm(provider="anthropic", model="claude-3-5-sonnet-20241022")
+
+# Ollama (local)
+llm = create_llm(provider="ollama", model="llama3.1")
+
+# LM Studio (OpenAI-compatible local server)
+llm = create_llm(
+    provider="lmstudio",
+    base_url="http://localhost:1234/v1",
+    model="local-model"
+)
+```
+
+#### Direct Provider Instantiation
+
+You can also use LangChain provider classes directly:
+
 ```python
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
+from langchain_ollama import ChatOllama
 
 # OpenAI
 llm_openai = ChatOpenAI(model="gpt-4o", temperature=0.3)
 
 # Anthropic Claude
 llm_claude = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
+
+# Ollama (local)
+llm_ollama = ChatOllama(model="llama3.1", base_url="http://localhost:11434")
 ```
+
+#### Local LLM Setup
+
+**Ollama:**
+1. Install Ollama from [ollama.ai](https://ollama.ai)
+2. Pull a model: `ollama pull llama3.1`
+3. Use with Solar-Flare:
+   ```python
+   llm = create_llm(provider="ollama", model="llama3.1")
+   ```
+
+**LM Studio:**
+1. Download LM Studio from [lmstudio.ai](https://lmstudio.ai)
+2. Load a model and start the local server
+3. Use with Solar-Flare:
+   ```python
+   llm = create_llm(provider="lmstudio", base_url="http://localhost:1234/v1")
+   ```
 
 ## Architecture
 

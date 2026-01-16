@@ -15,6 +15,12 @@ from solar_flare.graph.state import (
     CapabilityLevel,
 )
 from solar_flare.graph.workflow import create_workflow, compile_workflow
+from solar_flare.llm_providers import (
+    create_llm,
+    LLMProvider,
+    list_providers,
+    get_default_model,
+)
 
 __all__ = [
     "AgentState",
@@ -23,4 +29,8 @@ __all__ = [
     "CapabilityLevel",
     "create_workflow",
     "compile_workflow",
+    "create_llm",
+    "LLMProvider",
+    "list_providers",
+    "get_default_model",
 ]

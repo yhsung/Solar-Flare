@@ -7,18 +7,16 @@ to design a safety-critical logging service for automotive embedded systems.
 
 Prerequisites:
 1. Install dependencies: pip install -e .
-2. Set up API keys in .env file:
-   - OPENAI_API_KEY or ANTHROPIC_API_KEY
-   - TAVILY_API_KEY (for web search)
-3. Run: python examples/basic_usage.py
+2. Set up LLM provider (one of):
+   - Cloud: OPENAI_API_KEY or ANTHROPIC_API_KEY in .env file
+   - Local: Ollama running with models pulled, or LM Studio server
+3. Optional: TAVILY_API_KEY for web search
+4. Run: python examples/basic_usage.py
 """
 
 import asyncio
 import os
 from dotenv import load_dotenv
-
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 
 from solar_flare import (
     create_workflow,
@@ -27,6 +25,8 @@ from solar_flare import (
     HardwareConstraints,
     ASILLevel,
     CapabilityLevel,
+    create_llm,
+    LLMProvider,
 )
 
 
@@ -51,13 +51,9 @@ async def example_1_simple_design_request() -> None:
     """
     print_section("Example 1: Simple Ring Buffer Design Request")
 
-    # Initialize LLM (choose one based on your API key)
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    elif os.getenv("OPENAI_API_KEY"):
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
-    else:
-        raise ValueError("Please set ANTHROPIC_API_KEY or OPENAI_API_KEY in .env")
+    # Initialize LLM using the factory function
+    # The factory automatically detects available providers
+    llm = get_available_llm()
 
     # User request
     user_request = """
@@ -113,10 +109,7 @@ async def example_2_custom_hardware_constraints() -> None:
     """
     print_section("Example 2: Custom Hardware Constraints")
 
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+    llm = get_available_llm()
 
     # Define custom hardware constraints
     custom_constraints = HardwareConstraints(
@@ -161,10 +154,7 @@ async def example_3_compliance_analysis() -> None:
     """
     print_section("Example 3: Compliance Analysis")
 
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.2)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.2)
+    llm = get_available_llm()
 
     user_request = """
     Analyze the following logging design for ISO 26262 ASIL-D compliance:
@@ -213,10 +203,7 @@ async def example_4_interactive_workflow() -> None:
     """
     print_section("Example 4: Interactive Workflow")
 
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+    llm = get_available_llm()
 
     # Compile workflow with checkpointing enabled
     app = compile_workflow(llm, enable_checkpointing=True)
@@ -266,10 +253,7 @@ async def example_5_design_review_workflow() -> None:
     """
     print_section("Example 5: Full Design with Review")
 
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+    llm = get_available_llm()
 
     user_request = """
     I need a complete logging service design for a brake-by-wire system
@@ -342,15 +326,51 @@ async def example_5_design_review_workflow() -> None:
         print(result["final_response"])
 
 
+def get_available_llm():
+    """
+    Get an LLM instance based on available providers.
+    
+    Checks for cloud API keys first, then falls back to local providers.
+    """
+    # Check for cloud providers
+    if os.getenv("ANTHROPIC_API_KEY"):
+        print("Using Anthropic Claude")
+        return create_llm(provider=LLMProvider.ANTHROPIC, temperature=0.3)
+    elif os.getenv("OPENAI_API_KEY"):
+        print("Using OpenAI")
+        return create_llm(provider=LLMProvider.OPENAI, temperature=0.3)
+    
+    # Check for local providers
+    # Ollama: Check if there's a custom model set or use default
+    if os.getenv("OLLAMA_MODEL") or os.getenv("OLLAMA_BASE_URL"):
+        print("Using Ollama (local)")
+        return create_llm(provider=LLMProvider.OLLAMA, temperature=0.3)
+    
+    # LM Studio: Check if configured
+    if os.getenv("LMSTUDIO_BASE_URL"):
+        print("Using LM Studio (local)")
+        return create_llm(provider=LLMProvider.LMSTUDIO, temperature=0.3)
+    
+    # Default to trying Ollama with default settings
+    print("No cloud API keys found. Trying Ollama with default settings...")
+    print("Tip: Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or configure OLLAMA_MODEL")
+    return create_llm(provider=LLMProvider.OLLAMA, temperature=0.3)
+
+
 async def main() -> None:
     """Run all examples."""
     # Load environment variables
     load_dotenv()
 
-    # Verify API keys
-    if not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("OPENAI_API_KEY"):
-        print("Error: Please set ANTHROPIC_API_KEY or OPENAI_API_KEY in .env file")
-        return
+    # Check for API keys/providers and warn if missing
+    has_cloud = os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY")
+    has_local = os.getenv("OLLAMA_MODEL") or os.getenv("LMSTUDIO_BASE_URL")
+    
+    if not has_cloud and not has_local:
+        print("Note: No LLM provider explicitly configured.")
+        print("  Cloud: Set ANTHROPIC_API_KEY or OPENAI_API_KEY")
+        print("  Local: Set OLLAMA_MODEL or LMSTUDIO_BASE_URL")
+        print("  Defaulting to Ollama...")
 
     if not os.getenv("TAVILY_API_KEY"):
         print("Warning: TAVILY_API_KEY not set. Web search will not work.")
