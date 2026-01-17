@@ -49,6 +49,11 @@ from solar_flare.requirements_providers import (
     load_requirements_from_redmine,
     load_requirements_from_jira,
 )
+from solar_flare.tracing import (
+    create_langfuse_handler,
+    get_tracing_callbacks,
+    is_langfuse_configured,
+)
 
 __all__ = [
     "AgentState",
@@ -86,4 +91,8 @@ __all__ = [
     "create_requirements_provider",
     "load_requirements_from_redmine",
     "load_requirements_from_jira",
+    # Tracing
+    "create_langfuse_handler",
+    "get_tracing_callbacks",
+    "is_langfuse_configured",
 ]

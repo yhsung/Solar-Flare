@@ -47,12 +47,16 @@ ingestion = [
 redmine = ["python-redmine>=2.4.0"]
 jira = ["atlassian-python-api>=3.40.0"]
 
+# Observability and tracing
+tracing = ["langfuse>=2.0.0"]
+
 # All optional dependencies
 all = [
     "solar-flare[dev]",
     "solar-flare[ingestion]",
     "solar-flare[redmine]",
     "solar-flare[jira]",
+    "solar-flare[tracing]",
 ]
 
 
