@@ -54,6 +54,9 @@ OLLAMA_MODEL=llama3.1
 LMSTUDIO_BASE_URL=http://localhost:1234/v1
 LMSTUDIO_MODEL=local-model
 
+# LLM Settings
+LLM_TEMPERATURE=0.3  # 0.0=deterministic, 1.0=creative
+
 # Optional: For web search capabilities
 TAVILY_API_KEY=tvly-...
 
@@ -317,6 +320,62 @@ python examples/basic_usage.py
 python examples/advanced_usage.py
 ```
 
+### Example 5: Markdown Export
+
+Export workflow results to markdown files for documentation:
+
+```python
+from solar_flare import run_workflow, export_workflow_results
+
+result = await run_workflow(
+    llm=llm,
+    user_message="Design logging buffer",
+    output_dir="./output/my_design"  # Auto-exports to markdown
+)
+
+# Or manually export
+from solar_flare import export_workflow_results
+export_workflow_results(result, "./output/my_design")
+```
+
+Generated files:
+- `00_summary.md` - Workflow summary
+- `01_<agent_name>.md` - Per-agent results
+- `design_review.md` - Design review findings
+
+### Example 6: Multi-Turn Requirements with Session Persistence
+
+Maintain session history across multiple runs:
+
+```python
+from solar_flare import (
+    load_session, save_session, create_session,
+    append_iteration, merge_requirements
+)
+
+# Define requirements
+requirements = [
+    {"id": "REQ-001", "title": "Ring Buffer", "asil_level": "ASIL-D"},
+    {"id": "REQ-002", "title": "DMA Transport", "asil_level": "ASIL-D"},
+]
+
+# Load existing or create new session
+session = load_session("./output") or create_session("my-session", requirements)
+
+# Merge any new requirements (skips duplicates)
+merge_requirements(session, new_requirements)
+
+# Run iteration and save
+result = await run_workflow(llm=llm, user_message=message, output_dir="./output/iter_1")
+append_iteration(session, message, result.get("worker_results", []))
+save_session(session, "./output")
+```
+
+Session files:
+- `session.json` - Full session state
+- `session_summary.md` - Human-readable summary
+- `traceability_matrix.md` - Requirements trace
+
 ## Testing
 
 ### Run All Tests
@@ -360,10 +419,11 @@ async def run_workflow(
     hardware_constraints: Optional[HardwareConstraints] = None,
     session_id: str = "default",
     max_iterations: int = 10,
+    output_dir: Optional[str] = None,  # Auto-export to markdown
 ) -> Dict[str, Any]
 ```
 
-Convenience function to run a complete workflow execution.
+Convenience function to run a complete workflow execution. If `output_dir` is provided, results are automatically exported to markdown.
 
 #### `compile_workflow()`
 
