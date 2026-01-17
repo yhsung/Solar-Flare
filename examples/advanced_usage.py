@@ -950,11 +950,11 @@ result = await run_workflow(
         print("-" * 50)
         return
     
-    # Real Redmine fetch
     try:
         from solar_flare import (
             load_requirements_from_redmine,
             create_session,
+            load_session,
             save_session,
         )
         
@@ -962,11 +962,13 @@ result = await run_workflow(
         
         # Fetch requirements - adjust project name as needed
         project = os.getenv("REDMINE_PROJECT", "logging-service")
-        tracker = os.getenv("REDMINE_TRACKER", None)  # e.g., "Requirement"
+        tracker = os.getenv("REDMINE_TRACKER")  # None = fetch all trackers
         
         print(f"Fetching requirements from project: {project}")
         if tracker:
             print(f"  Filtering by tracker: {tracker}")
+        else:
+            print("  Fetching all issue types (no tracker filter)")
         
         requirements = load_requirements_from_redmine(
             project=project,
@@ -980,48 +982,130 @@ result = await run_workflow(
         if len(requirements) > 10:
             print(f"  ... and {len(requirements) - 10} more")
         
-        # Create session with requirements
+        # Output directory for traceability artifacts
         output_base = Path("./output/redmine_analysis")
         output_base.mkdir(parents=True, exist_ok=True)
         
-        session = create_session(
-            session_id="redmine-requirements",
-            requirements=requirements,
-            metadata={"source": "redmine", "project": project},
-        )
+        # Load existing session or create new
+        existing_session = load_session(output_base)
+        if existing_session:
+            print(f"\n[OK] Loaded existing session with {len(existing_session.iterations)} iterations")
+            # Merge new requirements
+            from solar_flare import merge_requirements
+            added = merge_requirements(existing_session, requirements)
+            if added:
+                print(f"  [OK] Merged {len(added)} new requirement(s)")
+            session = existing_session
+        else:
+            session = create_session(
+                session_id="redmine-requirements",
+                requirements=requirements,
+                metadata={"source": "redmine", "project": project},
+            )
+            print(f"\n[OK] Created new session with {len(requirements)} requirements")
         
-        save_session(session, output_base)
-        print(f"\n[OK] Created session with {len(requirements)} requirements")
-        print(f"  Session saved to: {output_base}")
+        # Determine next iteration
+        next_iter_id = session.get_next_iteration_id()
         
         # Optionally run analysis
         run_analysis = os.getenv("RUN_REDMINE_ANALYSIS", "false").lower() == "true"
         if run_analysis and requirements:
+            from solar_flare import (
+                append_iteration,
+                add_trace_entries,
+                export_workflow_results,
+            )
+            from solar_flare.session_state import generate_session_summary
+            
             llm = get_available_llm()
             
-            # Analyze first 3 requirements
+            # Analyze first 3 requirements (or all if fewer)
             req_subset = requirements[:3]
             req_ids = [r["id"] for r in req_subset]
             
-            print(f"\nAnalyzing requirements: {req_ids}")
+            print(f"\n" + "-" * 50)
+            print(f"RUNNING ITERATION {next_iter_id}")
+            print("-" * 50)
+            print(f"Analyzing requirements: {req_ids}")
+            
+            user_message = f"""
+            Analyze these automotive logging requirements for ISO 26262 compliance:
+            {json.dumps(req_subset, indent=2)}
+            """
+            
+            # Export to iteration folder
+            iter_dir = output_base / f"iteration_{next_iter_id}"
             
             result = await run_workflow(
                 llm=llm,
-                user_message=f"""
-                Analyze these automotive logging requirements for ISO 26262 compliance:
-                {json.dumps(req_subset, indent=2)}
-                """,
-                output_dir=str(output_base / "analysis"),
+                user_message=user_message,
+                output_dir=str(iter_dir),
             )
             
-            print(f"  [OK] Analysis complete")
-            print(f"  Workers invoked: {len(result.get('worker_results', []))}")
+            files = list(iter_dir.glob("*.md")) if iter_dir.exists() else []
+            print(f"  [OK] Exported {len(files)} files to {iter_dir}")
+            
+            # Record iteration
+            worker_results = result.get("worker_results", [])
+            iteration = append_iteration(
+                state=session,
+                user_message=user_message[:500],
+                worker_results=worker_results,
+                phase=result.get("current_phase", "complete"),
+                output_dir=f"iteration_{next_iter_id}",
+            )
+            print(f"  [OK] Recorded iteration {iteration.iteration_id}")
+            
+            # Add traceability entries
+            phase = result.get("current_phase", "complete")
+            agents = [w.agent_name for w in worker_results]
+            status = "analyzed" if result.get("design_review") else "partial"
+            add_trace_entries(session, next_iter_id, req_ids, phase, agents, status)
+            print(f"  [OK] Added {len(req_ids)} traceability entries")
+            
+            # Save session
+            save_session(session, output_base)
+            print(f"  [OK] Session saved")
+            
+            # Generate traceability report
+            print("-" * 50)
+            print("GENERATING TRACEABILITY REPORT")
+            print("-" * 50)
+            
+            trace_report = generate_persistent_traceability_report(session)
+            trace_file = output_base / "traceability_matrix.md"
+            trace_file.write_text(trace_report, encoding="utf-8")
+            print(f"  [OK] Traceability matrix: {trace_file}")
+            
+            # Generate session summary
+            summary = generate_session_summary(session)
+            summary_file = output_base / "session_summary.md"
+            summary_file.write_text(summary, encoding="utf-8")
+            print(f"  [OK] Session summary: {summary_file}")
+            
+            # Final summary
+            print(f"\n" + "=" * 50)
+            print("REDMINE ANALYSIS SUMMARY")
+            print("=" * 50)
+            print(f"Session ID: {session.session_id}")
+            print(f"Total iterations: {len(session.iterations)}")
+            print(f"Requirements tracked: {len(session.requirements)}")
+            print(f"Traceability entries: {len(session.traceability)}")
+            print(f"\nOutput directory: {output_base.absolute()}")
+            print(f"\n[TIP] Run again to add iteration {next_iter_id + 1}")
+        else:
+            save_session(session, output_base)
+            print(f"  Session saved to: {output_base}")
+            if not run_analysis:
+                print("\n[TIP] Set RUN_REDMINE_ANALYSIS=true in .env to run analysis")
         
     except ImportError as e:
         print(f"Error: python-redmine not installed: {e}")
         print("  Run: pip install python-redmine")
     except Exception as e:
-        print(f"Error connecting to Redmine: {e}")
+        import traceback
+        print(f"Error: {e}")
+        traceback.print_exc()
 
 
 
