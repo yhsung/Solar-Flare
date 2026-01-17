@@ -104,41 +104,58 @@ def format_design_review_markdown(review: DesignReviewResult) -> str:
     Format a DesignReviewResult as a markdown document.
 
     Args:
-        review: The design review result to format
+        review: The design review result to format (dict or DesignReviewResult)
 
     Returns:
         Formatted markdown string
     """
+    # Handle dict input (from serialization)
+    if isinstance(review, dict):
+        overall_status = review.get('overall_status', 'unknown')
+        completeness_score = review.get('completeness_score', 0)
+        gaps_identified = review.get('gaps_identified', [])
+        cross_reference_issues = review.get('cross_reference_issues', [])
+        constraint_violations = review.get('constraint_violations', [])
+        recommendations = review.get('recommendations', [])
+    else:
+        overall_status = review.overall_status
+        completeness_score = review.completeness_score
+        gaps_identified = review.gaps_identified
+        cross_reference_issues = review.cross_reference_issues
+        constraint_violations = review.constraint_violations
+        recommendations = review.recommendations
+
     # Map status to emoji
     status_emoji = {
         "approved": "✓",
         "needs_revision": "⚠",
         "rejected": "✗",
     }
-    emoji = status_emoji.get(review.overall_status, "•")
+    emoji = status_emoji.get(overall_status, "•")
 
     lines = [
         "# Design Review Results",
         "",
-        f"**Overall Status:** {review.overall_status.replace('_', ' ').title()} {emoji}  ",
-        f"**Completeness Score:** {review.completeness_score:.0f}%",
+        f"**Overall Status:** {overall_status.replace('_', ' ').title()} {emoji}  ",
+        f"**Completeness Score:** {completeness_score:.0f}%",
         "",
     ]
 
     # Progress bar visualization
-    filled = int(review.completeness_score / 10)
+    filled = int(completeness_score / 10)
     empty = 10 - filled
     progress = "█" * filled + "░" * empty
     lines.append(f"```")
-    lines.append(f"Completeness: [{progress}] {review.completeness_score:.0f}%")
+    lines.append(f"Completeness: [{progress}] {completeness_score:.0f}%")
     lines.append(f"```")
     lines.append("")
 
+
     # Gaps identified
-    if review.gaps_identified:
+    if gaps_identified:
         lines.append("## Gaps Identified")
         lines.append("")
-        for i, gap in enumerate(review.gaps_identified, 1):
+        for i, gap in enumerate(gaps_identified, 1):
             severity = gap.get("severity", "medium").upper()
             description = gap.get("description", "")
             lines.append(f"### Gap {i}: [{severity}]")
@@ -147,22 +164,22 @@ def format_design_review_markdown(review: DesignReviewResult) -> str:
             lines.append("")
 
     # Cross-reference issues
-    if review.cross_reference_issues:
+    if cross_reference_issues:
         lines.append("## Cross-Reference Issues")
         lines.append("")
-        for issue in review.cross_reference_issues:
+        for issue in cross_reference_issues:
             standard = issue.get("standard", "Unknown")
             description = issue.get("description", "")
             lines.append(f"- **{standard}**: {description}")
         lines.append("")
 
     # Constraint violations
-    if review.constraint_violations:
+    if constraint_violations:
         lines.append("## Constraint Violations")
         lines.append("")
         lines.append("| Constraint | Expected | Actual | Severity |")
         lines.append("|------------|----------|--------|----------|")
-        for violation in review.constraint_violations:
+        for violation in constraint_violations:
             constraint = violation.get("constraint", "Unknown")
             expected = violation.get("expected", "N/A")
             actual = violation.get("actual", "N/A")
@@ -171,10 +188,10 @@ def format_design_review_markdown(review: DesignReviewResult) -> str:
         lines.append("")
 
     # Recommendations
-    if review.recommendations:
+    if recommendations:
         lines.append("## Recommendations")
         lines.append("")
-        for i, rec in enumerate(review.recommendations, 1):
+        for i, rec in enumerate(recommendations, 1):
             lines.append(f"{i}. {rec}")
         lines.append("")
 
@@ -235,12 +252,24 @@ def format_workflow_summary(state: AgentState) -> str:
     # Design review summary
     review = state.get("design_review")
     if review:
+        # Handle dict or object
+        if isinstance(review, dict):
+            overall_status = review.get('overall_status', 'unknown')
+            completeness_score = review.get('completeness_score', 0)
+            gaps_count = len(review.get('gaps_identified', []))
+            violations_count = len(review.get('constraint_violations', []))
+        else:
+            overall_status = review.overall_status
+            completeness_score = review.completeness_score
+            gaps_count = len(review.gaps_identified)
+            violations_count = len(review.constraint_violations)
+        
         lines.append("## Design Review Summary")
         lines.append("")
-        lines.append(f"- **Status:** {review.overall_status.replace('_', ' ').title()}")
-        lines.append(f"- **Completeness:** {review.completeness_score:.0f}%")
-        lines.append(f"- **Gaps:** {len(review.gaps_identified)}")
-        lines.append(f"- **Violations:** {len(review.constraint_violations)}")
+        lines.append(f"- **Status:** {overall_status.replace('_', ' ').title()}")
+        lines.append(f"- **Completeness:** {completeness_score:.0f}%")
+        lines.append(f"- **Gaps:** {gaps_count}")
+        lines.append(f"- **Violations:** {violations_count}")
         lines.append("")
 
     # Errors
