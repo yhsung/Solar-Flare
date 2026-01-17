@@ -494,18 +494,26 @@ def get_available_llm():
 
 async def example_9_multi_turn_requirements() -> None:
     """
-    Example 9: Multi-turn requirements clarification with traceability.
+    Example 9: Multi-turn requirements clarification with persistent session state.
 
     Demonstrates how to:
-    1. Conduct iterative requirements clarification across multiple turns
-    2. Track requirements traceability across iterations
-    3. Export each iteration's output to markdown for audit trail
-    4. Build up a complete requirements trace matrix
+    1. Load existing session history or create new session
+    2. Append new iterations instead of overwriting
+    3. Track requirements traceability across multiple runs
+    4. Revise previous iterations when needed
 
-    This is useful for automotive projects where requirements must be
-    fully traced from user needs through to implementation.
+    Run this example multiple times to see iterations accumulate.
     """
-    print_header("Example 9: Multi-Turn Requirements Clarification")
+    print_header("Example 9: Multi-Turn Requirements (Persistent Sessions)")
+
+    from solar_flare import (
+        load_session,
+        save_session,
+        create_session,
+        append_iteration,
+        add_trace_entries,
+    )
+    from solar_flare.session_state import generate_session_summary
 
     llm = get_available_llm()
     app = compile_workflow(llm, enable_checkpointing=True)
@@ -518,212 +526,277 @@ async def example_9_multi_turn_requirements() -> None:
     session_id = "requirements-clarification-demo"
     config = {"configurable": {"thread_id": session_id}}
 
-    # Define a set of requirements to trace
-    requirements = [
-        {
-            "id": "REQ-001",
-            "title": "Ring Buffer Design",
-            "description": "Design a lock-free ring buffer for multi-core logging",
-            "priority": "high",
-            "asil_level": "ASIL-D",
-        },
-        {
-            "id": "REQ-002",
-            "title": "DMA Transport",
-            "description": "Implement DMA-based log transport with zero-copy semantics",
-            "priority": "high",
-            "asil_level": "ASIL-D",
-        },
-        {
-            "id": "REQ-003",
-            "title": "Overflow Handling",
-            "description": "Handle buffer overflow with configurable policies",
-            "priority": "medium",
-            "asil_level": "ASIL-B",
-        },
-    ]
+    # =========================================================
+    # Load or create session
+    # =========================================================
+    session = load_session(output_base)
+    
+    if session:
+        print(f"✓ Loaded existing session with {len(session.iterations)} iterations")
+        print(f"  Created: {session.created_at}")
+        print(f"  Last updated: {session.updated_at}")
+    else:
+        print("Creating new session...")
+        
+        # Define requirements for new session
+        requirements = [
+            {
+                "id": "REQ-001",
+                "title": "Ring Buffer Design",
+                "description": "Design a lock-free ring buffer for multi-core logging",
+                "priority": "high",
+                "asil_level": "ASIL-D",
+            },
+            {
+                "id": "REQ-002",
+                "title": "DMA Transport",
+                "description": "Implement DMA-based log transport with zero-copy semantics",
+                "priority": "high",
+                "asil_level": "ASIL-D",
+            },
+            {
+                "id": "REQ-003",
+                "title": "Overflow Handling",
+                "description": "Handle buffer overflow with configurable policies",
+                "priority": "medium",
+                "asil_level": "ASIL-B",
+            },
+        ]
+        
+        session = create_session(
+            session_id=session_id,
+            requirements=requirements,
+            metadata={"platform": "Infineon AURIX TC397", "rtos": "AUTOSAR OS"},
+        )
+        print(f"✓ Created new session with {len(requirements)} requirements")
 
-    print("Requirements to trace:")
-    for req in requirements:
-        print(f"  [{req['id']}] {req['title']} ({req['asil_level']})")
+    # Show requirements
+    print("\nRequirements tracked:")
+    for req in session.requirements:
+        print(f"  [{req.id}] {req.title} ({req.asil_level})")
     print()
 
-    # Multi-turn conversation state
-    all_results = []
-    traceability_matrix = []
-    current_state = None
+    # =========================================================
+    # Determine next iteration
+    # =========================================================
+    next_iter_id = session.get_next_iteration_id()
+    
+    # Define messages for each iteration
+    iteration_messages = {
+        1: f"""
+        Analyze the following logging system requirements for an automotive ECU:
+
+        Requirements:
+        {json.dumps([{"id": r.id, "title": r.title, "asil_level": r.asil_level} for r in session.requirements], indent=2)}
+
+        For each requirement:
+        1. Identify ISO 26262 implications based on ASIL level
+        2. Suggest high-level design approach
+        3. Note any clarifications needed
+
+        Hardware platform: {session.metadata.get('platform', 'Unknown')}
+        RTOS: {session.metadata.get('rtos', 'Unknown')}
+        """,
+        2: """
+        Follow-up on REQ-001 (Ring Buffer):
+
+        Based on the initial analysis, please clarify:
+        1. What is the recommended memory allocation strategy for ASIL-D?
+        2. How should we handle the atomic operations on Cortex-R52?
+        3. What diagnostic coverage is required for ASIL-D?
+
+        Provide specific recommendations with ISO 26262 Part 6 references.
+        """,
+        3: """
+        Follow-up on REQ-002 (DMA Transport) and REQ-003 (Overflow Handling):
+
+        For REQ-002:
+        - How do we ensure data integrity during DMA transfers?
+        - What are the timing constraints for the logging path?
+
+        For REQ-003:
+        - What are the ASPICE requirements for overflow handling?
+        - How do we trace the overflow policy configuration?
+        """,
+    }
+
+    # Get message for next iteration (or cycle through)
+    if next_iter_id > len(iteration_messages):
+        print(f"All {len(iteration_messages)} standard iterations complete.")
+        print("Adding a custom follow-up iteration...")
+        user_message = f"""
+        Iteration {next_iter_id}: Provide a summary of all previous analyses 
+        and create a consolidated design document for the logging service.
+        """
+    else:
+        user_message = iteration_messages[next_iter_id]
 
     # =========================================================
-    # Iteration 1: Initial requirements analysis
+    # Run iteration
     # =========================================================
     print("-" * 50)
-    print("ITERATION 1: Initial Requirements Analysis")
+    print(f"RUNNING ITERATION {next_iter_id}")
     print("-" * 50)
 
-    initial_message = f"""
-    Analyze the following logging system requirements for an automotive ECU:
-
-    Requirements:
-    {json.dumps(requirements, indent=2)}
-
-    For each requirement:
-    1. Identify ISO 26262 implications based on ASIL level
-    2. Suggest high-level design approach
-    3. Note any clarifications needed
-
-    Hardware platform: Infineon AURIX TC397
-    RTOS: AUTOSAR OS
-    """
+    # Build conversation state from session history
+    messages = [HumanMessage(content=user_message)]
+    
+    # If we have previous iterations, include their context
+    if session.iterations:
+        last_iter = session.iterations[-1]
+        print(f"  Building on iteration {last_iter.iteration_id} ({last_iter.phase})")
 
     current_state = create_initial_state(
-        messages=[HumanMessage(content=initial_message)],
+        messages=messages,
         hardware_constraints=HardwareConstraints(),
         max_iterations=10,
     )
 
-    result1 = await app.ainvoke(current_state, config)
-    all_results.append(("iteration_1_initial_analysis", result1))
+    result = await app.ainvoke(current_state, config)
+    worker_results = result.get("worker_results", [])
 
-    # Export iteration 1 results
-    iter1_dir = output_base / "iteration_1"
-    files1 = export_workflow_results(result1, iter1_dir)
-    print(f"  Exported {len(files1)} files to {iter1_dir}")
-
-    # Track requirements coverage
-    for req in requirements:
-        traceability_matrix.append({
-            "requirement_id": req["id"],
-            "iteration": 1,
-            "phase": "initial_analysis",
-            "agents_involved": [w.agent_name for w in result1.get("worker_results", [])],
-            "status": "analyzed",
-        })
-
-    print(f"  Workers invoked: {len(result1.get('worker_results', []))}")
+    # Export iteration results
+    iter_dir = output_base / f"iteration_{next_iter_id}"
+    files = export_workflow_results(result, iter_dir)
+    print(f"  ✓ Exported {len(files)} files to {iter_dir}")
 
     # =========================================================
-    # Iteration 2: Follow-up clarification on REQ-001
+    # Update session state
     # =========================================================
-    print("-" * 50)
-    print("ITERATION 2: Clarification for REQ-001 (Ring Buffer)")
-    print("-" * 50)
+    iteration = append_iteration(
+        state=session,
+        user_message=user_message,
+        worker_results=worker_results,
+        phase=result.get("current_phase", "complete"),
+        output_dir=f"iteration_{next_iter_id}",
+    )
+    print(f"  ✓ Recorded iteration {iteration.iteration_id}")
 
-    clarification_message = """
-    Follow-up on REQ-001 (Ring Buffer):
+    # Add traceability entries
+    if next_iter_id == 1:
+        req_ids = [r.id for r in session.requirements]
+        phase = "initial_analysis"
+        status = "analyzed"
+    elif next_iter_id == 2:
+        req_ids = ["REQ-001"]
+        phase = "clarification"
+        status = "clarified"
+    elif next_iter_id == 3:
+        req_ids = ["REQ-002", "REQ-003"]
+        phase = "clarification"
+        status = "clarified"
+    else:
+        req_ids = [r.id for r in session.requirements]
+        phase = "consolidation"
+        status = "consolidated"
 
-    Based on the initial analysis, please clarify:
-    1. What is the recommended memory allocation strategy for ASIL-D?
-       (static vs dynamic allocation)
-    2. How should we handle the atomic operations on Cortex-R52?
-    3. What diagnostic coverage is required for ASIL-D?
+    agents = [w.agent_name for w in worker_results]
+    add_trace_entries(session, next_iter_id, req_ids, phase, agents, status)
+    print(f"  ✓ Added {len(req_ids)} traceability entries")
 
-    Provide specific recommendations with ISO 26262 Part 6 references.
-    """
-
-    # Continue the conversation by extending messages
-    result2_state = {
-        **result1,
-        "messages": result1["messages"] + [HumanMessage(content=clarification_message)],
-        "iteration_count": 0,  # Reset for new iteration
-        "current_phase": "understanding",
-    }
-
-    result2 = await app.ainvoke(result2_state, config)
-    all_results.append(("iteration_2_req001_clarification", result2))
-
-    # Export iteration 2 results
-    iter2_dir = output_base / "iteration_2"
-    files2 = export_workflow_results(result2, iter2_dir)
-    print(f"  Exported {len(files2)} files to {iter2_dir}")
-
-    traceability_matrix.append({
-        "requirement_id": "REQ-001",
-        "iteration": 2,
-        "phase": "clarification",
-        "agents_involved": [w.agent_name for w in result2.get("worker_results", [])],
-        "status": "clarified",
-    })
-
-    print(f"  Workers invoked: {len(result2.get('worker_results', []))}")
+    # Save session
+    save_session(session, output_base)
+    print(f"  ✓ Session saved")
 
     # =========================================================
-    # Iteration 3: Follow-up clarification on REQ-002 & REQ-003
-    # =========================================================
-    print("-" * 50)
-    print("ITERATION 3: Clarification for REQ-002 & REQ-003")
-    print("-" * 50)
-
-    combined_clarification = """
-    Follow-up on REQ-002 (DMA Transport) and REQ-003 (Overflow Handling):
-
-    For REQ-002:
-    - How do we ensure data integrity during DMA transfers?
-    - What are the timing constraints for the logging path?
-
-    For REQ-003:
-    - What are the ASPICE requirements for overflow handling?
-    - How do we trace the overflow policy configuration?
-
-    Please provide a design that addresses both requirements together,
-    as they are closely related.
-    """
-
-    result3_state = {
-        **result2,
-        "messages": result2["messages"] + [HumanMessage(content=combined_clarification)],
-        "iteration_count": 0,
-        "current_phase": "understanding",
-    }
-
-    result3 = await app.ainvoke(result3_state, config)
-    all_results.append(("iteration_3_req002_003_clarification", result3))
-
-    # Export iteration 3 results
-    iter3_dir = output_base / "iteration_3"
-    files3 = export_workflow_results(result3, iter3_dir)
-    print(f"  Exported {len(files3)} files to {iter3_dir}")
-
-    for req_id in ["REQ-002", "REQ-003"]:
-        traceability_matrix.append({
-            "requirement_id": req_id,
-            "iteration": 3,
-            "phase": "clarification",
-            "agents_involved": [w.agent_name for w in result3.get("worker_results", [])],
-            "status": "clarified",
-        })
-
-    print(f"  Workers invoked: {len(result3.get('worker_results', []))}")
-
-    # =========================================================
-    # Generate Traceability Report
+    # Generate updated traceability report
     # =========================================================
     print("-" * 50)
     print("GENERATING TRACEABILITY REPORT")
     print("-" * 50)
 
-    # Create traceability matrix markdown
-    trace_report = generate_traceability_report(
-        requirements, traceability_matrix, all_results
-    )
+    trace_report = generate_persistent_traceability_report(session)
     trace_file = output_base / "traceability_matrix.md"
     trace_file.write_text(trace_report, encoding="utf-8")
-    print(f"  Traceability matrix: {trace_file}")
+    print(f"  ✓ Traceability matrix: {trace_file}")
 
+    # Generate session summary
+    summary = generate_session_summary(session)
+    summary_file = output_base / "session_summary.md"
+    summary_file.write_text(summary, encoding="utf-8")
+    print(f"  ✓ Session summary: {summary_file}")
+
+    # =========================================================
     # Summary
+    # =========================================================
     print("\n" + "=" * 50)
     print("MULTI-TURN REQUIREMENTS SUMMARY")
     print("=" * 50)
-    print(f"Total iterations: {len(all_results)}")
-    print(f"Requirements traced: {len(requirements)}")
-    print(f"Traceability entries: {len(traceability_matrix)}")
+    print(f"Session ID: {session.session_id}")
+    print(f"Total iterations: {len(session.iterations)}")
+    print(f"Requirements tracked: {len(session.requirements)}")
+    print(f"Traceability entries: {len(session.traceability)}")
     print(f"\nOutput directory: {output_base.absolute()}")
     print("\nGenerated artifacts:")
-    for subdir in sorted(output_base.iterdir()):
-        if subdir.is_dir():
-            file_count = len(list(subdir.glob("*.md")))
-            print(f"  {subdir.name}/: {file_count} markdown files")
+    for item in sorted(output_base.iterdir()):
+        if item.is_dir():
+            file_count = len(list(item.glob("*.md")))
+            print(f"  {item.name}/: {file_count} markdown files")
         else:
-            print(f"  {subdir.name}")
+            print(f"  {item.name}")
+    
+    print(f"\n💡 Run this example again to add iteration {next_iter_id + 1}")
+
+
+def generate_persistent_traceability_report(session) -> str:
+    """Generate a markdown traceability report from session state."""
+    from datetime import datetime
+
+    lines = [
+        "# Requirements Traceability Matrix",
+        "",
+        f"**Session ID:** {session.session_id}",
+        f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"**Total Iterations:** {len(session.iterations)}",
+        "",
+        "## Requirements Overview",
+        "",
+        "| ID | Title | ASIL Level | Priority |",
+        "|----|-------|------------|----------|",
+    ]
+
+    for req in session.requirements:
+        lines.append(f"| {req.id} | {req.title} | {req.asil_level} | {req.priority} |")
+
+    lines.extend([
+        "",
+        "## Traceability Matrix",
+        "",
+        "| Requirement | Iteration | Phase | Agents | Status | Timestamp |",
+        "|-------------|-----------|-------|--------|--------|-----------|",
+    ])
+
+    for trace in session.traceability:
+        agents = ", ".join(trace.agents_involved[:2])
+        if len(trace.agents_involved) > 2:
+            agents += f" (+{len(trace.agents_involved) - 2})"
+        timestamp = trace.timestamp.split("T")[0] if "T" in trace.timestamp else trace.timestamp[:10]
+        lines.append(
+            f"| {trace.requirement_id} | {trace.iteration_id} | "
+            f"{trace.phase} | {agents} | {trace.status} | {timestamp} |"
+        )
+
+    lines.extend([
+        "",
+        "## Iteration History",
+        "",
+    ])
+
+    for iteration in session.iterations:
+        revision_note = ""
+        if iteration.revision_of:
+            revision_note = f" (revision of #{iteration.revision_of})"
+        
+        lines.append(f"### Iteration {iteration.iteration_id}{revision_note}")
+        lines.append("")
+        lines.append(f"- **Timestamp:** {iteration.timestamp}")
+        lines.append(f"- **Workers:** {iteration.worker_count}")
+        lines.append(f"- **Status:** {iteration.status.value}")
+        if iteration.output_dir:
+            lines.append(f"- **Output:** [{iteration.output_dir}](./{iteration.output_dir}/)")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 def generate_traceability_report(
@@ -731,7 +804,7 @@ def generate_traceability_report(
     traceability_matrix: list,
     all_results: list,
 ) -> str:
-    """Generate a markdown traceability report."""
+    """Generate a markdown traceability report (legacy function)."""
     from datetime import datetime
 
     lines = [
@@ -781,22 +854,16 @@ def generate_traceability_report(
         lines.append(f"- **Phase:** {phase}")
         lines.append(f"- **Workers:** {worker_count}")
         if result.get("final_response"):
-            # Show first 200 chars of response
             response_preview = result["final_response"][:200]
             if len(result["final_response"]) > 200:
                 response_preview += "..."
             lines.append(f"- **Response preview:** {response_preview}")
         lines.append("")
 
-    lines.extend([
-        "## Artifact Links",
-        "",
-        "- [Iteration 1: Initial Analysis](./iteration_1/)",
-        "- [Iteration 2: REQ-001 Clarification](./iteration_2/)",
-        "- [Iteration 3: REQ-002 & REQ-003 Clarification](./iteration_3/)",
-    ])
-
     return "\n".join(lines)
+
+
+
 
 
 

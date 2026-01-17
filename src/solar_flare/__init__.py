@@ -29,6 +29,17 @@ from solar_flare.markdown_export import (
     format_worker_result_markdown,
     format_design_review_markdown,
 )
+from solar_flare.session_state import (
+    SessionState,
+    IterationRecord,
+    TraceEntry,
+    create_session,
+    load_session,
+    save_session,
+    append_iteration,
+    revise_iteration,
+    add_trace_entries,
+)
 
 __all__ = [
     "AgentState",
@@ -48,5 +59,16 @@ __all__ = [
     "format_workflow_summary",
     "format_worker_result_markdown",
     "format_design_review_markdown",
+    # Session state
+    "SessionState",
+    "IterationRecord",
+    "TraceEntry",
+    "create_session",
+    "load_session",
+    "save_session",
+    "append_iteration",
+    "revise_iteration",
+    "add_trace_entries",
 ]
+
 
