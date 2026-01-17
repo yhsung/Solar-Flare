@@ -9,11 +9,16 @@ across multiple runs, enabling:
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass, field, asdict
 from enum import Enum
+
+
+def _now_with_tz() -> str:
+    """Get current timestamp with timezone info in ISO format."""
+    return datetime.now().astimezone().isoformat()
 
 
 class IterationStatus(str, Enum):
@@ -31,7 +36,7 @@ class TraceEntry:
     phase: str
     agents_involved: List[str]
     status: str
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: str = field(default_factory=_now_with_tz)
     revision: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
@@ -76,7 +81,7 @@ class RequirementDef:
     description: str
     priority: str
     asil_level: str
-    added_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    added_at: str = field(default_factory=_now_with_tz)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -163,7 +168,7 @@ def create_session(
     Returns:
         New SessionState instance
     """
-    now = datetime.now().isoformat()
+    now = _now_with_tz()
     reqs = []
     if requirements:
         for r in requirements:
@@ -224,7 +229,7 @@ def save_session(state: SessionState, session_dir: Union[str, Path]) -> Path:
     session_path.mkdir(parents=True, exist_ok=True)
     
     # Update timestamp
-    state.updated_at = datetime.now().isoformat()
+    state.updated_at = _now_with_tz()
     
     file_path = session_path / "session.json"
     with open(file_path, "w", encoding="utf-8") as f:
@@ -275,7 +280,7 @@ def append_iteration(
     
     iteration = IterationRecord(
         iteration_id=iteration_id,
-        timestamp=datetime.now().isoformat(),
+        timestamp=_now_with_tz(),
         user_message=user_message[:500],  # Truncate long messages
         phase=phase,
         worker_count=len(worker_results),
@@ -286,7 +291,7 @@ def append_iteration(
     )
     
     state.iterations.append(iteration)
-    state.updated_at = datetime.now().isoformat()
+    state.updated_at = _now_with_tz()
     
     return iteration
 
@@ -332,7 +337,7 @@ def revise_iteration(
     
     iteration = IterationRecord(
         iteration_id=new_iteration_id,
-        timestamp=datetime.now().isoformat(),
+        timestamp=_now_with_tz(),
         user_message=user_message[:500],
         phase=phase,
         worker_count=len(worker_results),
@@ -345,7 +350,7 @@ def revise_iteration(
     )
     
     state.iterations.append(iteration)
-    state.updated_at = datetime.now().isoformat()
+    state.updated_at = _now_with_tz()
     
     return iteration
 
@@ -384,7 +389,7 @@ def add_trace_entries(
         state.traceability.append(entry)
         entries.append(entry)
     
-    state.updated_at = datetime.now().isoformat()
+    state.updated_at = _now_with_tz()
     return entries
 
 
