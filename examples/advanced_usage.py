@@ -10,6 +10,7 @@ This example demonstrates advanced features including:
 5. Multi-session management
 6. Markdown export of agent results
 7. Multi-turn requirements clarification with traceability
+8. Fetching requirements from Redmine
 
 Prerequisites:
 1. Complete basic_usage.py prerequisites
@@ -884,6 +885,143 @@ def generate_traceability_report(
     return "\n".join(lines)
 
 
+async def example_10_redmine_requirements() -> None:
+    """
+    Example 10: Fetch requirements from Redmine and analyze with agents.
+
+    Demonstrates how to:
+    1. Connect to Redmine and fetch requirements
+    2. Create a session with imported requirements
+    3. Run multi-turn analysis on real requirements
+
+    Prerequisites:
+    - Set REDMINE_URL and REDMINE_API_KEY in .env
+    - pip install python-redmine
+    """
+    print_header("Example 10: Redmine Requirements Import")
+
+    # Check for Redmine configuration
+    redmine_url = os.getenv("REDMINE_URL")
+    redmine_key = os.getenv("REDMINE_API_KEY")
+    
+    if not redmine_url:
+        print("Redmine not configured. Showing mock example...")
+        print()
+        print("To use Redmine, set these in your .env file:")
+        print("  REDMINE_URL=https://your-redmine.example.com")
+        print("  REDMINE_API_KEY=your-api-key")
+        print()
+        print("Then install: pip install python-redmine")
+        print()
+        
+        # Show what would happen with mock data
+        mock_requirements = [
+            {"id": "REQ-101", "title": "Ring Buffer Implementation", "asil_level": "ASIL-D", "priority": "high"},
+            {"id": "REQ-102", "title": "DMA Transfer Engine", "asil_level": "ASIL-C", "priority": "high"},
+            {"id": "REQ-103", "title": "Overflow Policy Handler", "asil_level": "ASIL-B", "priority": "medium"},
+        ]
+        
+        print("Mock requirements that would be fetched:")
+        for req in mock_requirements:
+            print(f"  [{req['id']}] {req['title']} ({req['asil_level']})")
+        
+        print()
+        print("Example code to fetch from Redmine:")
+        print("-" * 50)
+        print("""
+from solar_flare import load_requirements_from_redmine, create_session
+
+# Fetch requirements from Redmine
+requirements = load_requirements_from_redmine(
+    project="logging-service",
+    tracker="Requirement",  # Filter by tracker type
+    limit=50,
+)
+
+# Create session with imported requirements
+session = create_session("redmine-session", requirements=requirements)
+
+# Now run the workflow with these requirements
+result = await run_workflow(
+    llm=llm,
+    user_message=f"Analyze requirements: {[r['id'] for r in requirements]}",
+)
+""")
+        print("-" * 50)
+        return
+    
+    # Real Redmine fetch
+    try:
+        from solar_flare import (
+            load_requirements_from_redmine,
+            create_session,
+            save_session,
+        )
+        
+        print(f"Connecting to Redmine: {redmine_url}")
+        
+        # Fetch requirements - adjust project name as needed
+        project = os.getenv("REDMINE_PROJECT", "logging-service")
+        tracker = os.getenv("REDMINE_TRACKER", None)  # e.g., "Requirement"
+        
+        print(f"Fetching requirements from project: {project}")
+        if tracker:
+            print(f"  Filtering by tracker: {tracker}")
+        
+        requirements = load_requirements_from_redmine(
+            project=project,
+            tracker=tracker,
+            limit=20,
+        )
+        
+        print(f"\n[OK] Fetched {len(requirements)} requirements:")
+        for req in requirements[:10]:  # Show first 10
+            print(f"  [{req['id']}] {req['title']}")
+        if len(requirements) > 10:
+            print(f"  ... and {len(requirements) - 10} more")
+        
+        # Create session with requirements
+        output_base = Path("./output/redmine_analysis")
+        output_base.mkdir(parents=True, exist_ok=True)
+        
+        session = create_session(
+            session_id="redmine-requirements",
+            requirements=requirements,
+            metadata={"source": "redmine", "project": project},
+        )
+        
+        save_session(session, output_base)
+        print(f"\n[OK] Created session with {len(requirements)} requirements")
+        print(f"  Session saved to: {output_base}")
+        
+        # Optionally run analysis
+        run_analysis = os.getenv("RUN_REDMINE_ANALYSIS", "false").lower() == "true"
+        if run_analysis and requirements:
+            llm = get_available_llm()
+            
+            # Analyze first 3 requirements
+            req_subset = requirements[:3]
+            req_ids = [r["id"] for r in req_subset]
+            
+            print(f"\nAnalyzing requirements: {req_ids}")
+            
+            result = await run_workflow(
+                llm=llm,
+                user_message=f"""
+                Analyze these automotive logging requirements for ISO 26262 compliance:
+                {json.dumps(req_subset, indent=2)}
+                """,
+                output_dir=str(output_base / "analysis"),
+            )
+            
+            print(f"  [OK] Analysis complete")
+            print(f"  Workers invoked: {len(result.get('worker_results', []))}")
+        
+    except ImportError as e:
+        print(f"Error: python-redmine not installed: {e}")
+        print("  Run: pip install python-redmine")
+    except Exception as e:
+        print(f"Error connecting to Redmine: {e}")
 
 
 
@@ -915,7 +1053,8 @@ async def main() -> None:
     # await example_6_concurrent_agent_execution()
     # await example_7_custom_constraints()
     # await example_8_markdown_export()
-    await example_9_multi_turn_requirements()  # Multi-turn with traceability
+    # await example_9_multi_turn_requirements()  # Multi-turn with traceability
+    await example_10_redmine_requirements()  # Redmine integration
 
     print("\n" + "=" * 70)
     print("Advanced examples completed!")
