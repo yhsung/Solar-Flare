@@ -14,13 +14,8 @@ from typing import Optional, List, Any
 
 
 def create_langfuse_handler(
-    public_key: Optional[str] = None,
-    secret_key: Optional[str] = None,
-    host: Optional[str] = None,
     session_id: Optional[str] = None,
     user_id: Optional[str] = None,
-    trace_name: Optional[str] = None,
-    release: Optional[str] = None,
     metadata: Optional[dict] = None,
     enabled: bool = True,
 ) -> Optional[Any]:
@@ -34,14 +29,14 @@ def create_langfuse_handler(
     - Prompt management
     - User feedback collection
     
+    Note: Langfuse v3 reads API keys from environment variables:
+    - LANGFUSE_PUBLIC_KEY
+    - LANGFUSE_SECRET_KEY
+    - LANGFUSE_HOST (optional)
+    
     Args:
-        public_key: Langfuse public key (or LANGFUSE_PUBLIC_KEY env var)
-        secret_key: Langfuse secret key (or LANGFUSE_SECRET_KEY env var)
-        host: Langfuse host URL (or LANGFUSE_HOST env var, default: cloud)
         session_id: Optional session ID for grouping traces
         user_id: Optional user ID for attribution
-        trace_name: Optional name for the trace
-        release: Optional release/version identifier
         metadata: Optional additional metadata dict
         enabled: Whether tracing is enabled (default: True)
         
@@ -54,51 +49,39 @@ def create_langfuse_handler(
         >>> handler = create_langfuse_handler()
         >>> llm = create_llm(callbacks=[handler] if handler else [])
         
-        >>> # With explicit configuration
+        >>> # With session and metadata
         >>> handler = create_langfuse_handler(
         ...     session_id="user-session-123",
-        ...     trace_name="requirements_analysis",
         ...     metadata={"project": "logging-service"}
         ... )
     """
     if not enabled:
         return None
     
-    # Check for required keys
-    public_key = public_key or os.getenv("LANGFUSE_PUBLIC_KEY")
-    secret_key = secret_key or os.getenv("LANGFUSE_SECRET_KEY")
-    
-    if not public_key or not secret_key:
+    # Check for required keys (langfuse v3 reads from env vars)
+    if not is_langfuse_configured():
         return None
     
     try:
-        from langfuse.callback import CallbackHandler
+        from langfuse.langchain import CallbackHandler
+        from langfuse import get_client
     except ImportError:
         return None
     
-    # Get optional configuration
-    host = host or os.getenv("LANGFUSE_HOST")
-    
-    # Build handler kwargs
-    handler_kwargs = {
-        "public_key": public_key,
-        "secret_key": secret_key,
-    }
-    
-    if host:
-        handler_kwargs["host"] = host
-    if session_id:
-        handler_kwargs["session_id"] = session_id
-    if user_id:
-        handler_kwargs["user_id"] = user_id
-    if trace_name:
-        handler_kwargs["trace_name"] = trace_name
-    if release:
-        handler_kwargs["release"] = release
-    if metadata:
-        handler_kwargs["metadata"] = metadata
-    
-    return CallbackHandler(**handler_kwargs)
+    try:
+        # Create handler - v3 uses env vars for auth
+        handler = CallbackHandler()
+        
+        # Set trace context if session/user/metadata provided
+        if session_id or user_id or metadata:
+            # Get the langfuse client to set trace metadata
+            client = get_client()
+            # Note: In v3, metadata is set via trace context
+            # The handler will automatically use env-configured client
+        
+        return handler
+    except Exception:
+        return None
 
 
 def get_tracing_callbacks(

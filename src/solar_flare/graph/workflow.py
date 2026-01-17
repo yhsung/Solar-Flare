@@ -374,6 +374,7 @@ async def run_workflow(
     session_id: str = "default",
     max_iterations: int = 10,
     output_dir: Optional[str] = None,
+    callbacks: Optional[List[Any]] = None,
 ) -> Dict[str, Any]:
     """
     Convenience function to run a single workflow execution.
@@ -387,6 +388,7 @@ async def run_workflow(
         output_dir: Optional directory to export agent results as markdown files.
                     If provided, creates numbered markdown files for each agent's
                     results plus a summary file.
+        callbacks: Optional list of callback handlers (e.g., for Langfuse tracing)
 
     Returns:
         Final state with response. If output_dir is provided, also includes
@@ -405,8 +407,10 @@ async def run_workflow(
         max_iterations=max_iterations,
     )
 
-    # Run workflow
+    # Run workflow with optional callbacks
     config = {"configurable": {"thread_id": session_id}}
+    if callbacks:
+        config["callbacks"] = callbacks
     result = await app.ainvoke(initial_state, config)
 
     # Export to markdown if output_dir provided

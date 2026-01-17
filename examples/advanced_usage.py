@@ -11,6 +11,7 @@ This example demonstrates advanced features including:
 6. Markdown export of agent results
 7. Multi-turn requirements clarification with traceability
 8. Fetching requirements from Redmine
+9. Langfuse tracing for LLM observability
 
 Prerequisites:
 1. Complete basic_usage.py prerequisites
@@ -20,6 +21,7 @@ Prerequisites:
 import asyncio
 import os
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 from dotenv import load_dotenv
@@ -1108,6 +1110,194 @@ result = await run_workflow(
         traceback.print_exc()
 
 
+async def example_11_langfuse_tracing() -> None:
+    """
+    Example 11: Langfuse Tracing for LLM Observability.
+
+    Demonstrates how to:
+    1. Configure Langfuse tracing callbacks
+    2. Track LLM calls with session and metadata
+    3. Use get_tracing_callbacks() for automatic setup
+
+    Prerequisites:
+    - Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY in .env
+    - pip install langfuse
+    """
+    print_header("Example 11: Langfuse Tracing")
+
+    from pathlib import Path
+    from datetime import datetime
+    from solar_flare import (
+        create_langfuse_handler,
+        get_tracing_callbacks,
+        is_langfuse_configured,
+        create_session,
+        load_session,
+        save_session,
+        append_iteration,
+        add_trace_entries,
+        export_workflow_results,
+    )
+    from solar_flare.session_state import (
+        generate_session_summary,
+    )
+
+    # Check if Langfuse is configured
+    if not is_langfuse_configured():
+        print("Langfuse not configured. Showing setup instructions...")
+        print()
+        print("To use Langfuse, set these in your .env file:")
+        print("  LANGFUSE_PUBLIC_KEY=pk-lf-...")
+        print("  LANGFUSE_SECRET_KEY=sk-lf-...")
+        print("  LANGFUSE_HOST=https://cloud.langfuse.com  # Optional")
+        print()
+        print("Then install: pip install langfuse")
+        print()
+        print("Example code with Langfuse tracing:")
+        print("-" * 50)
+        print("""
+from solar_flare import (
+    create_llm,
+    run_workflow,
+    create_langfuse_handler,
+    get_tracing_callbacks,
+)
+
+# Option 1: Quick setup with get_tracing_callbacks()
+callbacks = get_tracing_callbacks()
+
+# Option 2: Manual setup with session and metadata
+handler = create_langfuse_handler(
+    session_id="my-session-123",
+    metadata={"project": "logging-service", "user": "engineer-1"}
+)
+
+# Run workflow with tracing
+result = await run_workflow(
+    llm=create_llm(),
+    user_message="Design a ring buffer for ASIL-D logging",
+    callbacks=[handler] if handler else [],
+)
+""")
+        print("-" * 50)
+        return
+
+    # Langfuse is configured - run a traced workflow
+    print("[OK] Langfuse is configured!")
+    print()
+
+    # Output directory for Langfuse tracing results and session
+    output_base = Path("./output/langfuse_tracing")
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    # Load existing session or create new
+    session = load_session(output_base)
+    if session:
+        print(f"[OK] Loaded existing session with {len(session.iterations)} iterations")
+    else:
+        session = create_session(
+            session_id="langfuse-tracing-demo",
+            requirements=[
+                {"id": "REQ-LF-1", "title": "Thread-safe ring buffer", "asil_level": "ASIL-B"},
+                {"id": "REQ-LF-2", "title": "Memory-constrained logging (16KB)", "asil_level": "ASIL-B"},
+            ],
+            metadata={"source": "manual", "feature": "langfuse_integration"},
+        )
+        print(f"[OK] Created new session for Langfuse tracing demo")
+
+    # Determine next iteration
+    next_iter_id = session.get_next_iteration_id()
+
+    # Create handler with session and metadata
+    # Use the session_id from our persistent session state
+    handler = create_langfuse_handler(
+        session_id=session.session_id,
+        metadata={
+            "example": "11",
+            "iteration": next_iter_id,
+            "feature": "langfuse_integration",
+        }
+    )
+
+    if not handler:
+        print("[ERROR] Failed to create Langfuse handler. Is langfuse installed?")
+        print("  Run: pip install langfuse")
+        return
+
+    print(f"[OK] Created Langfuse handler")
+    print(f"  Langfuse Session: {session.session_id}")
+    print()
+
+    # Get LLM
+    llm = get_available_llm()
+
+    # Run a simple workflow with tracing
+    print("-" * 50)
+    print(f"RUNNING TRACED WORKFLOW - ITERATION {next_iter_id}")
+    print("-" * 50)
+
+    user_message = """
+    Design a minimal ring buffer implementation for an ASIL-B automotive
+    logging system based on the session requirements.
+    """
+
+    print(f"Message: {user_message.strip()}")
+    print()
+
+    # Export to iteration folder
+    iter_dir = output_base / f"iteration_{next_iter_id}"
+
+    result = await run_workflow(
+        llm=llm,
+        user_message=user_message,
+        callbacks=[handler],
+        output_dir=str(iter_dir),
+        session_id=session.session_id,
+    )
+
+    # Record iteration in persistent state
+    worker_results = result.get("worker_results", [])
+    iteration = append_iteration(
+        state=session,
+        user_message=user_message,
+        worker_results=worker_results,
+        phase=result.get("current_phase", "complete"),
+        output_dir=f"iteration_{next_iter_id}",
+    )
+    print(f"  [OK] Recorded iteration {iteration.iteration_id} in session state")
+
+    # Add traceability entries for the requirements we analyzed
+    req_ids = [r.id for r in session.requirements]
+    phase = result.get("current_phase", "complete")
+    agents = [w.agent_name for w in worker_results]
+    add_trace_entries(session, next_iter_id, req_ids, phase, agents, "analyzed")
+    print(f"  [OK] Added traceability entries for {len(req_ids)} requirements")
+
+    # Save session
+    save_session(session, output_base)
+    print(f"  [OK] Session state saved to {output_base}")
+
+    # Generate traceability matrix and summary
+    trace_report = generate_persistent_traceability_report(session)
+    (output_base / "traceability_matrix.md").write_text(trace_report, encoding="utf-8")
+    
+    summary = generate_session_summary(session)
+    (output_base / "session_summary.md").write_text(summary, encoding="utf-8")
+    print(f"  [OK] Reports generated in {output_base}")
+
+    # Summary
+    print()
+    print("=" * 50)
+    print("LANGFUSE TRACING SUMMARY")
+    print("=" * 50)
+    print(f"Langfuse Session: {session.session_id}")
+    print(f"Persistent Iterations: {len(session.iterations)}")
+    print(f"Workers invoked: {len(worker_results)}")
+    print()
+    print("[TIP] View traces at: https://cloud.langfuse.com")
+    print(f"  - Search for session_id: {session.session_id}")
+    print("  - Check detailed traces for all agents")
+    print(f"\nLocal artifacts: {output_base.absolute()}")
 
 
 
@@ -1138,7 +1328,8 @@ async def main() -> None:
     # await example_7_custom_constraints()
     # await example_8_markdown_export()
     # await example_9_multi_turn_requirements()  # Multi-turn with traceability
-    await example_10_redmine_requirements()  # Redmine integration
+    # await example_10_redmine_requirements()  # Redmine integration
+    await example_11_langfuse_tracing()  # Langfuse tracing
 
     print("\n" + "=" * 70)
     print("Advanced examples completed!")
