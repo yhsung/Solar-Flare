@@ -8,6 +8,8 @@ This example demonstrates advanced features including:
 3. Manual workflow graph traversal
 4. State inspection and debugging
 5. Multi-session management
+6. Markdown export of agent results
+7. Multi-turn requirements clarification with traceability
 
 Prerequisites:
 1. Complete basic_usage.py prerequisites
@@ -17,17 +19,21 @@ Prerequisites:
 import asyncio
 import os
 import json
+from pathlib import Path
 from typing import Any, Dict
 from dotenv import load_dotenv
 
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, AIMessage
 
 from solar_flare import (
     create_workflow,
     compile_workflow,
+    run_workflow,
     HardwareConstraints,
+    create_llm,
+    LLMProvider,
+    export_workflow_results,
+    format_workflow_summary,
 )
 from solar_flare.graph.state import create_initial_state
 
@@ -48,10 +54,8 @@ async def example_1_streaming_workflow() -> None:
     """
     print_header("Example 1: Streaming Workflow Execution")
 
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+    # Use the create_llm factory for unified provider access
+    llm = get_available_llm()
 
     # Compile workflow
     app = compile_workflow(llm, enable_checkpointing=True)
@@ -95,10 +99,7 @@ async def example_2_step_by_step_execution() -> None:
     """
     print_header("Example 2: Step-by-Step Execution")
 
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+    llm = get_available_llm()
 
     # Create workflow (not compiled)
     workflow = create_workflow(llm, HardwareConstraints())
@@ -150,10 +151,7 @@ async def example_3_multi_session_management() -> None:
     """
     print_header("Example 3: Multi-Session Management")
 
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+    llm = get_available_llm()
 
     app = compile_workflow(llm, enable_checkpointing=True)
 
@@ -205,10 +203,7 @@ async def example_4_state_inspection() -> None:
     """
     print_header("Example 4: State Inspection & Debugging")
 
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+    llm = get_available_llm()
 
     app = compile_workflow(llm, enable_checkpointing=True)
 
@@ -280,10 +275,7 @@ async def example_5_error_handling() -> None:
     """
     print_header("Example 5: Error Handling & Recovery")
 
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+    llm = get_available_llm()
 
     app = compile_workflow(llm, enable_checkpointing=True)
 
@@ -325,10 +317,7 @@ async def example_6_concurrent_agent_execution() -> None:
     """
     print_header("Example 6: Concurrent Agent Execution")
 
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+    llm = get_available_llm()
 
     # Complex request that will trigger multiple agents
     complex_request = """
@@ -412,10 +401,7 @@ async def example_7_custom_constraints() -> None:
         print()
 
     # Example: Select platform based on request
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3)
-    else:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+    llm = get_available_llm()
 
     # Use AURIX constraints
     selected_constraints = platform_constraints["infineon-aurix"]
@@ -433,27 +419,415 @@ async def example_7_custom_constraints() -> None:
     print("Design generated with custom constraints applied.")
     print(f"Workers invoked: {len(result.get('worker_results', []))}")
 
+async def example_8_markdown_export() -> None:
+    """
+    Example 8: Export agent results to markdown files.
+
+    Demonstrates how to export each agent's result to well-formatted
+    markdown files for documentation and review.
+    """
+    print_header("Example 8: Markdown Export of Agent Results")
+
+    llm = get_available_llm()
+
+    # Create output directory
+    output_dir = Path("./output/agent_results")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"Output directory: {output_dir.absolute()}\n")
+
+    # Run workflow with automatic markdown export
+    result = await run_workflow(
+        llm=llm,
+        user_message="Design a lock-free ring buffer for ASIL-D compliance",
+        session_id="markdown-export-demo",
+        output_dir=str(output_dir),
+    )
+
+    # Check exported files
+    if "exported_files" in result:
+        print("Exported markdown files:")
+        for filepath in result["exported_files"]:
+            print(f"  ✓ {filepath}")
+    else:
+        # Manual export if not auto-exported
+        print("Manually exporting results...")
+        files = export_workflow_results(result, output_dir)
+        print("Exported markdown files:")
+        for filepath in files:
+            print(f"  ✓ {filepath}")
+
+    # Also show summary in console
+    print("\n" + "-" * 50)
+    print("Workflow Summary Preview:")
+    print("-" * 50)
+    summary = format_workflow_summary(result)
+    # Print first 30 lines of summary
+    summary_lines = summary.split("\n")[:30]
+    print("\n".join(summary_lines))
+    if len(summary.split("\n")) > 30:
+        print("\n... (truncated, see full file in output directory)")
+
+
+def get_available_llm():
+    """
+    Get an LLM instance based on available providers.
+    
+    Checks for cloud API keys first, then falls back to local providers.
+    """
+    if os.getenv("ANTHROPIC_API_KEY"):
+        print("Using Anthropic Claude")
+        return create_llm(provider=LLMProvider.ANTHROPIC, temperature=0.3)
+    elif os.getenv("OPENAI_API_KEY"):
+        print("Using OpenAI")
+        return create_llm(provider=LLMProvider.OPENAI, temperature=0.3)
+    elif os.getenv("OLLAMA_MODEL") or os.getenv("OLLAMA_BASE_URL"):
+        print("Using Ollama (local)")
+        return create_llm(provider=LLMProvider.OLLAMA, temperature=0.3)
+    elif os.getenv("LMSTUDIO_BASE_URL"):
+        print("Using LM Studio (local)")
+        return create_llm(provider=LLMProvider.LMSTUDIO, temperature=0.3)
+    else:
+        print("No cloud API keys found. Trying Ollama with default settings...")
+        return create_llm(provider=LLMProvider.OLLAMA, temperature=0.3)
+
+
+async def example_9_multi_turn_requirements() -> None:
+    """
+    Example 9: Multi-turn requirements clarification with traceability.
+
+    Demonstrates how to:
+    1. Conduct iterative requirements clarification across multiple turns
+    2. Track requirements traceability across iterations
+    3. Export each iteration's output to markdown for audit trail
+    4. Build up a complete requirements trace matrix
+
+    This is useful for automotive projects where requirements must be
+    fully traced from user needs through to implementation.
+    """
+    print_header("Example 9: Multi-Turn Requirements Clarification")
+
+    llm = get_available_llm()
+    app = compile_workflow(llm, enable_checkpointing=True)
+    
+    # Create output directory for traceability artifacts
+    output_base = Path("./output/requirements_trace")
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    # Define a session for multi-turn conversation
+    session_id = "requirements-clarification-demo"
+    config = {"configurable": {"thread_id": session_id}}
+
+    # Define a set of requirements to trace
+    requirements = [
+        {
+            "id": "REQ-001",
+            "title": "Ring Buffer Design",
+            "description": "Design a lock-free ring buffer for multi-core logging",
+            "priority": "high",
+            "asil_level": "ASIL-D",
+        },
+        {
+            "id": "REQ-002",
+            "title": "DMA Transport",
+            "description": "Implement DMA-based log transport with zero-copy semantics",
+            "priority": "high",
+            "asil_level": "ASIL-D",
+        },
+        {
+            "id": "REQ-003",
+            "title": "Overflow Handling",
+            "description": "Handle buffer overflow with configurable policies",
+            "priority": "medium",
+            "asil_level": "ASIL-B",
+        },
+    ]
+
+    print("Requirements to trace:")
+    for req in requirements:
+        print(f"  [{req['id']}] {req['title']} ({req['asil_level']})")
+    print()
+
+    # Multi-turn conversation state
+    all_results = []
+    traceability_matrix = []
+    current_state = None
+
+    # =========================================================
+    # Iteration 1: Initial requirements analysis
+    # =========================================================
+    print("-" * 50)
+    print("ITERATION 1: Initial Requirements Analysis")
+    print("-" * 50)
+
+    initial_message = f"""
+    Analyze the following logging system requirements for an automotive ECU:
+
+    Requirements:
+    {json.dumps(requirements, indent=2)}
+
+    For each requirement:
+    1. Identify ISO 26262 implications based on ASIL level
+    2. Suggest high-level design approach
+    3. Note any clarifications needed
+
+    Hardware platform: Infineon AURIX TC397
+    RTOS: AUTOSAR OS
+    """
+
+    current_state = create_initial_state(
+        messages=[HumanMessage(content=initial_message)],
+        hardware_constraints=HardwareConstraints(),
+        max_iterations=10,
+    )
+
+    result1 = await app.ainvoke(current_state, config)
+    all_results.append(("iteration_1_initial_analysis", result1))
+
+    # Export iteration 1 results
+    iter1_dir = output_base / "iteration_1"
+    files1 = export_workflow_results(result1, iter1_dir)
+    print(f"  Exported {len(files1)} files to {iter1_dir}")
+
+    # Track requirements coverage
+    for req in requirements:
+        traceability_matrix.append({
+            "requirement_id": req["id"],
+            "iteration": 1,
+            "phase": "initial_analysis",
+            "agents_involved": [w.agent_name for w in result1.get("worker_results", [])],
+            "status": "analyzed",
+        })
+
+    print(f"  Workers invoked: {len(result1.get('worker_results', []))}")
+
+    # =========================================================
+    # Iteration 2: Follow-up clarification on REQ-001
+    # =========================================================
+    print("-" * 50)
+    print("ITERATION 2: Clarification for REQ-001 (Ring Buffer)")
+    print("-" * 50)
+
+    clarification_message = """
+    Follow-up on REQ-001 (Ring Buffer):
+
+    Based on the initial analysis, please clarify:
+    1. What is the recommended memory allocation strategy for ASIL-D?
+       (static vs dynamic allocation)
+    2. How should we handle the atomic operations on Cortex-R52?
+    3. What diagnostic coverage is required for ASIL-D?
+
+    Provide specific recommendations with ISO 26262 Part 6 references.
+    """
+
+    # Continue the conversation by extending messages
+    result2_state = {
+        **result1,
+        "messages": result1["messages"] + [HumanMessage(content=clarification_message)],
+        "iteration_count": 0,  # Reset for new iteration
+        "current_phase": "understanding",
+    }
+
+    result2 = await app.ainvoke(result2_state, config)
+    all_results.append(("iteration_2_req001_clarification", result2))
+
+    # Export iteration 2 results
+    iter2_dir = output_base / "iteration_2"
+    files2 = export_workflow_results(result2, iter2_dir)
+    print(f"  Exported {len(files2)} files to {iter2_dir}")
+
+    traceability_matrix.append({
+        "requirement_id": "REQ-001",
+        "iteration": 2,
+        "phase": "clarification",
+        "agents_involved": [w.agent_name for w in result2.get("worker_results", [])],
+        "status": "clarified",
+    })
+
+    print(f"  Workers invoked: {len(result2.get('worker_results', []))}")
+
+    # =========================================================
+    # Iteration 3: Follow-up clarification on REQ-002 & REQ-003
+    # =========================================================
+    print("-" * 50)
+    print("ITERATION 3: Clarification for REQ-002 & REQ-003")
+    print("-" * 50)
+
+    combined_clarification = """
+    Follow-up on REQ-002 (DMA Transport) and REQ-003 (Overflow Handling):
+
+    For REQ-002:
+    - How do we ensure data integrity during DMA transfers?
+    - What are the timing constraints for the logging path?
+
+    For REQ-003:
+    - What are the ASPICE requirements for overflow handling?
+    - How do we trace the overflow policy configuration?
+
+    Please provide a design that addresses both requirements together,
+    as they are closely related.
+    """
+
+    result3_state = {
+        **result2,
+        "messages": result2["messages"] + [HumanMessage(content=combined_clarification)],
+        "iteration_count": 0,
+        "current_phase": "understanding",
+    }
+
+    result3 = await app.ainvoke(result3_state, config)
+    all_results.append(("iteration_3_req002_003_clarification", result3))
+
+    # Export iteration 3 results
+    iter3_dir = output_base / "iteration_3"
+    files3 = export_workflow_results(result3, iter3_dir)
+    print(f"  Exported {len(files3)} files to {iter3_dir}")
+
+    for req_id in ["REQ-002", "REQ-003"]:
+        traceability_matrix.append({
+            "requirement_id": req_id,
+            "iteration": 3,
+            "phase": "clarification",
+            "agents_involved": [w.agent_name for w in result3.get("worker_results", [])],
+            "status": "clarified",
+        })
+
+    print(f"  Workers invoked: {len(result3.get('worker_results', []))}")
+
+    # =========================================================
+    # Generate Traceability Report
+    # =========================================================
+    print("-" * 50)
+    print("GENERATING TRACEABILITY REPORT")
+    print("-" * 50)
+
+    # Create traceability matrix markdown
+    trace_report = generate_traceability_report(
+        requirements, traceability_matrix, all_results
+    )
+    trace_file = output_base / "traceability_matrix.md"
+    trace_file.write_text(trace_report, encoding="utf-8")
+    print(f"  Traceability matrix: {trace_file}")
+
+    # Summary
+    print("\n" + "=" * 50)
+    print("MULTI-TURN REQUIREMENTS SUMMARY")
+    print("=" * 50)
+    print(f"Total iterations: {len(all_results)}")
+    print(f"Requirements traced: {len(requirements)}")
+    print(f"Traceability entries: {len(traceability_matrix)}")
+    print(f"\nOutput directory: {output_base.absolute()}")
+    print("\nGenerated artifacts:")
+    for subdir in sorted(output_base.iterdir()):
+        if subdir.is_dir():
+            file_count = len(list(subdir.glob("*.md")))
+            print(f"  {subdir.name}/: {file_count} markdown files")
+        else:
+            print(f"  {subdir.name}")
+
+
+def generate_traceability_report(
+    requirements: list,
+    traceability_matrix: list,
+    all_results: list,
+) -> str:
+    """Generate a markdown traceability report."""
+    from datetime import datetime
+
+    lines = [
+        "# Requirements Traceability Matrix",
+        "",
+        f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "## Requirements Overview",
+        "",
+        "| ID | Title | ASIL Level | Priority |",
+        "|----|-------|------------|----------|",
+    ]
+
+    for req in requirements:
+        lines.append(
+            f"| {req['id']} | {req['title']} | {req['asil_level']} | {req['priority']} |"
+        )
+
+    lines.extend([
+        "",
+        "## Traceability Matrix",
+        "",
+        "| Requirement | Iteration | Phase | Agents | Status |",
+        "|-------------|-----------|-------|--------|--------|",
+    ])
+
+    for trace in traceability_matrix:
+        agents = ", ".join(trace["agents_involved"][:2])
+        if len(trace["agents_involved"]) > 2:
+            agents += f" (+{len(trace['agents_involved']) - 2})"
+        lines.append(
+            f"| {trace['requirement_id']} | {trace['iteration']} | "
+            f"{trace['phase']} | {agents} | {trace['status']} |"
+        )
+
+    lines.extend([
+        "",
+        "## Iteration Summary",
+        "",
+    ])
+
+    for name, result in all_results:
+        worker_count = len(result.get("worker_results", []))
+        phase = result.get("current_phase", "unknown")
+        lines.append(f"### {name.replace('_', ' ').title()}")
+        lines.append("")
+        lines.append(f"- **Phase:** {phase}")
+        lines.append(f"- **Workers:** {worker_count}")
+        if result.get("final_response"):
+            # Show first 200 chars of response
+            response_preview = result["final_response"][:200]
+            if len(result["final_response"]) > 200:
+                response_preview += "..."
+            lines.append(f"- **Response preview:** {response_preview}")
+        lines.append("")
+
+    lines.extend([
+        "## Artifact Links",
+        "",
+        "- [Iteration 1: Initial Analysis](./iteration_1/)",
+        "- [Iteration 2: REQ-001 Clarification](./iteration_2/)",
+        "- [Iteration 3: REQ-002 & REQ-003 Clarification](./iteration_3/)",
+    ])
+
+    return "\n".join(lines)
+
+
+
 
 async def main() -> None:
     """Run all advanced examples."""
     load_dotenv()
 
-    # Verify API keys
-    if not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("OPENAI_API_KEY"):
-        print("Error: Please set ANTHROPIC_API_KEY or OPENAI_API_KEY in .env file")
-        return
+    # Check for providers
+    has_cloud = os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY")
+    has_local = os.getenv("OLLAMA_MODEL") or os.getenv("LMSTUDIO_BASE_URL")
+    
+    if not has_cloud and not has_local:
+        print("Note: No LLM provider explicitly configured.")
+        print("  Cloud: Set ANTHROPIC_API_KEY or OPENAI_API_KEY")
+        print("  Local: Set OLLAMA_MODEL or LMSTUDIO_BASE_URL")
+        print("  Defaulting to Ollama...")
 
     print("Solar-Flare Advanced Examples")
     print("=" * 70)
 
     # Run examples (comment out as needed)
-    await example_1_streaming_workflow()
+    # await example_1_streaming_workflow()
     # await example_2_step_by_step_execution()
     # await example_3_multi_session_management()
     # await example_4_state_inspection()
     # await example_5_error_handling()
     # await example_6_concurrent_agent_execution()
     # await example_7_custom_constraints()
+    # await example_8_markdown_export()
+    await example_9_multi_turn_requirements()  # Multi-turn with traceability
 
     print("\n" + "=" * 70)
     print("Advanced examples completed!")
