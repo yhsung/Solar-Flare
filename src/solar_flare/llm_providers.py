@@ -20,6 +20,7 @@ class LLMProvider(str, Enum):
     ANTHROPIC = "anthropic"
     OLLAMA = "ollama"
     LMSTUDIO = "lmstudio"
+    DEEPSEEK = "deepseek"
 
 
 # Default models for each provider
@@ -28,12 +29,14 @@ DEFAULT_MODELS = {
     LLMProvider.ANTHROPIC: "claude-3-5-sonnet-20241022",
     LLMProvider.OLLAMA: "llama3.1",
     LLMProvider.LMSTUDIO: "local-model",
+    LLMProvider.DEEPSEEK: "deepseek-chat",
 }
 
 # Default base URLs for local providers
 DEFAULT_BASE_URLS = {
     LLMProvider.OLLAMA: "http://localhost:11434",
     LLMProvider.LMSTUDIO: "http://localhost:1234/v1",
+    LLMProvider.DEEPSEEK: "https://api.deepseek.com",
 }
 
 
@@ -88,6 +91,9 @@ def create_llm(
         ...     provider="lmstudio",
         ...     base_url="http://localhost:1234/v1"
         ... )
+
+        >>> # DeepSeek
+        >>> llm = create_llm(provider="deepseek", model="deepseek-chat")
     """
     # Normalize provider to enum
     if isinstance(provider, str):
@@ -122,6 +128,8 @@ def create_llm(
         return _create_ollama_llm(model, temperature, base_url, **kwargs)
     elif provider == LLMProvider.LMSTUDIO:
         return _create_lmstudio_llm(model, temperature, base_url, api_key, **kwargs)
+    elif provider == LLMProvider.DEEPSEEK:
+        return _create_deepseek_llm(model, temperature, base_url, api_key, **kwargs)
     else:
         raise ValueError(f"Unsupported provider: {provider}")
 
@@ -234,6 +242,50 @@ def _create_lmstudio_llm(
     # Use a dummy key if not provided
     if api_key is None:
         api_key = os.getenv("LMSTUDIO_API_KEY", "lm-studio")
+
+    return ChatOpenAI(
+        model=model,
+        temperature=temperature,
+        base_url=base_url,
+        api_key=api_key,
+        **kwargs,
+    )
+
+
+def _create_deepseek_llm(
+    model: str,
+    temperature: float,
+    base_url: Optional[str],
+    api_key: Optional[str],
+    **kwargs,
+) -> BaseChatModel:
+    """
+    Create a DeepSeek ChatModel instance.
+
+    DeepSeek provides an OpenAI-compatible API, so we use ChatOpenAI
+    with a custom base_url pointing to api.deepseek.com.
+    """
+    try:
+        from langchain_openai import ChatOpenAI
+    except ImportError:
+        raise ImportError(
+            "langchain-openai package is required for DeepSeek provider. "
+            "Install it with: pip install langchain-openai"
+        )
+
+    if base_url is None:
+        base_url = os.getenv(
+            "DEEPSEEK_BASE_URL", DEFAULT_BASE_URLS[LLMProvider.DEEPSEEK]
+        )
+
+    if api_key is None:
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+
+    if not api_key:
+        raise ValueError(
+            "DeepSeek API key is required. "
+            "Set DEEPSEEK_API_KEY environment variable or pass api_key parameter."
+        )
 
     return ChatOpenAI(
         model=model,
