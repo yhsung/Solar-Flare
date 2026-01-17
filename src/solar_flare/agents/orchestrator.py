@@ -336,7 +336,19 @@ class OrchestratorAgent:
         return "\n".join(f"- {item}" for item in items)
 
     def _format_design_review(self, review) -> str:
-        """Format design review result."""
+        """Format design review result (handles both dict and DesignReviewResult)."""
+        # Handle dict input (from serialization/deserialization)
+        if isinstance(review, dict):
+            return f"""**Status**: {review.get('overall_status', 'unknown')}
+**Completeness**: {review.get('completeness_score', 0):.0f}%
+
+**Gaps**: {len(review.get('gaps_identified', []))} identified
+**Constraint Violations**: {len(review.get('constraint_violations', []))}
+
+**Recommendations**:
+{self._format_list(review.get('recommendations', []))}
+"""
+        # Handle DesignReviewResult object
         return f"""**Status**: {review.overall_status}
 **Completeness**: {review.completeness_score:.0f}%
 
@@ -346,3 +358,4 @@ class OrchestratorAgent:
 **Recommendations**:
 {self._format_list(review.recommendations)}
 """
+
