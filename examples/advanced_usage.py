@@ -560,6 +560,13 @@ async def example_9_multi_turn_requirements() -> None:
             "priority": "high",
             "asil_level": "QM",
         },
+        {
+            "id": "REQ-005",
+            "title": "Debug interface",
+            "description": "Provide a debug interface for the logging system via USB",
+            "priority": "medium",
+            "asil_level": "QM",
+        },
     ]
     
     session = load_session(output_base)

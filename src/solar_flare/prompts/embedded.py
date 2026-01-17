@@ -154,9 +154,9 @@ Base + 0xXXXX: [Descriptor Queue - M entries]
 ### Implementation Example
 ```c
 /* Reference implementation */
-typedef struct {
+typedef struct {{
     // Field definitions with sizes and alignment
-} component_t;
+}} component_t;
 
 // Key functions with inline comments
 ```
