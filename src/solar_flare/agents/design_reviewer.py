@@ -141,10 +141,20 @@ class DesignReviewAgent(BaseWorkerAgent):
                 findings, asil_level, aspice_level
             )
 
+            # Map review status to WorkerResult status
+            # DesignReviewResult uses: approved, needs_revision, rejected
+            # WorkerResult uses: success, partial, failed
+            status_mapping = {
+                "approved": "success",
+                "needs_revision": "partial",
+                "rejected": "failed",
+            }
+            worker_status = status_mapping.get(review_result.overall_status, "partial")
+
             return WorkerResult(
                 agent_name=self.agent_name,
                 task_type="design_review",
-                status=review_result.overall_status,
+                status=worker_status,
                 findings=findings,
                 recommendations=recommendations,
                 artifacts={
