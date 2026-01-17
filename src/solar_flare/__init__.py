@@ -13,13 +13,21 @@ from solar_flare.graph.state import (
     HardwareConstraints,
     ASILLevel,
     CapabilityLevel,
+    WorkerResult,
+    DesignReviewResult,
 )
-from solar_flare.graph.workflow import create_workflow, compile_workflow
+from solar_flare.graph.workflow import create_workflow, compile_workflow, run_workflow
 from solar_flare.llm_providers import (
     create_llm,
     LLMProvider,
     list_providers,
     get_default_model,
+)
+from solar_flare.markdown_export import (
+    export_workflow_results,
+    format_workflow_summary,
+    format_worker_result_markdown,
+    format_design_review_markdown,
 )
 
 __all__ = [
@@ -27,10 +35,18 @@ __all__ = [
     "HardwareConstraints",
     "ASILLevel",
     "CapabilityLevel",
+    "WorkerResult",
+    "DesignReviewResult",
     "create_workflow",
     "compile_workflow",
+    "run_workflow",
     "create_llm",
     "LLMProvider",
     "list_providers",
     "get_default_model",
+    "export_workflow_results",
+    "format_workflow_summary",
+    "format_worker_result_markdown",
+    "format_design_review_markdown",
 ]
+

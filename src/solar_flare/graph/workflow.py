@@ -373,6 +373,7 @@ async def run_workflow(
     hardware_constraints: Optional[HardwareConstraints] = None,
     session_id: str = "default",
     max_iterations: int = 10,
+    output_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Convenience function to run a single workflow execution.
@@ -383,9 +384,13 @@ async def run_workflow(
         hardware_constraints: Hardware constraints (uses defaults if None)
         session_id: Session identifier for checkpointing
         max_iterations: Maximum workflow iterations
+        output_dir: Optional directory to export agent results as markdown files.
+                    If provided, creates numbered markdown files for each agent's
+                    results plus a summary file.
 
     Returns:
-        Final state with response
+        Final state with response. If output_dir is provided, also includes
+        'exported_files' key with list of created file paths.
     """
     if hardware_constraints is None:
         hardware_constraints = HardwareConstraints()
@@ -404,4 +409,11 @@ async def run_workflow(
     config = {"configurable": {"thread_id": session_id}}
     result = await app.ainvoke(initial_state, config)
 
+    # Export to markdown if output_dir provided
+    if output_dir:
+        from solar_flare.markdown_export import export_workflow_results
+        exported_files = export_workflow_results(result, output_dir)
+        result["exported_files"] = [str(f) for f in exported_files]
+
     return result
+

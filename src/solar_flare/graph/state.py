@@ -135,6 +135,11 @@ class WorkerResult(BaseModel):
         description="Agent's confidence in the result (0-1)",
     )
 
+    def to_markdown(self) -> str:
+        """Format this result as a markdown document."""
+        from solar_flare.markdown_export import format_worker_result_markdown
+        return format_worker_result_markdown(self)
+
 
 class DesignReviewResult(BaseModel):
     """Result from the Design Review Agent's cross-validation analysis."""
@@ -163,6 +168,11 @@ class DesignReviewResult(BaseModel):
         default_factory=list,
         description="Prioritized recommendations for improvement",
     )
+
+    def to_markdown(self) -> str:
+        """Format this review as a markdown document."""
+        from solar_flare.markdown_export import format_design_review_markdown
+        return format_design_review_markdown(self)
 
 
 class OrchestratorDecision(BaseModel):
