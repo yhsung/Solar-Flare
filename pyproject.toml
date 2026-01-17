@@ -43,11 +43,18 @@ ingestion = [
     "msal>=1.26.0",
 ]
 
+# Requirements management integrations
+redmine = ["python-redmine>=2.4.0"]
+jira = ["atlassian-python-api>=3.40.0"]
+
 # All optional dependencies
 all = [
     "solar-flare[dev]",
     "solar-flare[ingestion]",
+    "solar-flare[redmine]",
+    "solar-flare[jira]",
 ]
+
 
 [build-system]
 requires = ["setuptools>=61.0"]

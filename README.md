@@ -376,7 +376,53 @@ Session files:
 - `session_summary.md` - Human-readable summary
 - `traceability_matrix.md` - Requirements trace
 
+### Example 7: Import Requirements from Redmine/Jira
+
+Fetch requirements directly from your issue tracker:
+
+```python
+from solar_flare import (
+    load_requirements_from_redmine,
+    load_requirements_from_jira,
+    create_session,
+)
+
+# From Redmine (filter by tracker type)
+requirements = load_requirements_from_redmine(
+    project="logging-service",
+    tracker="Requirement",  # Filter by tracker name
+)
+
+# From Jira (filter with JQL)
+requirements = load_requirements_from_jira(
+    project="LOG",
+    jql="type = Requirement AND status != Done",
+)
+
+# Use with session
+session = create_session("my-session", requirements=requirements)
+```
+
+**Installation:**
+```bash
+pip install solar-flare[redmine]  # For Redmine
+pip install solar-flare[jira]     # For Jira
+```
+
+**Configuration (.env):**
+```bash
+# Redmine
+REDMINE_URL=https://redmine.example.com
+REDMINE_API_KEY=your-api-key
+
+# Jira  
+JIRA_URL=https://company.atlassian.net
+JIRA_USERNAME=email@example.com
+JIRA_API_TOKEN=your-api-token
+```
+
 ## Testing
+
 
 ### Run All Tests
 

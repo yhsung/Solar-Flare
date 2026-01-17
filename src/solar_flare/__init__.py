@@ -41,6 +41,14 @@ from solar_flare.session_state import (
     add_trace_entries,
     merge_requirements,
 )
+from solar_flare.requirements_providers import (
+    RequirementsProvider,
+    RedmineProvider,
+    JiraProvider,
+    create_requirements_provider,
+    load_requirements_from_redmine,
+    load_requirements_from_jira,
+)
 
 __all__ = [
     "AgentState",
@@ -71,6 +79,11 @@ __all__ = [
     "revise_iteration",
     "add_trace_entries",
     "merge_requirements",
+    # Requirements providers
+    "RequirementsProvider",
+    "RedmineProvider",
+    "JiraProvider",
+    "create_requirements_provider",
+    "load_requirements_from_redmine",
+    "load_requirements_from_jira",
 ]
-
-
