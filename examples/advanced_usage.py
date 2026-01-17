@@ -85,7 +85,7 @@ async def example_1_streaming_workflow() -> None:
             if any(agent in name for agent in [
                 "orchestrator", "iso_26262", "embedded", "aspice", "review"
             ]):
-                print(f"✓ Completed: {name}")
+                print(f"[OK] Completed: {name}")
 
     print("\nStreaming complete!")
 
@@ -448,14 +448,14 @@ async def example_8_markdown_export() -> None:
     if "exported_files" in result:
         print("Exported markdown files:")
         for filepath in result["exported_files"]:
-            print(f"  ✓ {filepath}")
+            print(f"  [OK] {filepath}")
     else:
         # Manual export if not auto-exported
         print("Manually exporting results...")
         files = export_workflow_results(result, output_dir)
         print("Exported markdown files:")
         for filepath in files:
-            print(f"  ✓ {filepath}")
+            print(f"  [OK] {filepath}")
 
     # Also show summary in console
     print("\n" + "-" * 50)
@@ -477,19 +477,19 @@ def get_available_llm():
     """
     if os.getenv("ANTHROPIC_API_KEY"):
         print("Using Anthropic Claude")
-        return create_llm(provider=LLMProvider.ANTHROPIC, temperature=0.3)
+        return create_llm(provider=LLMProvider.ANTHROPIC)
     elif os.getenv("OPENAI_API_KEY"):
         print("Using OpenAI")
-        return create_llm(provider=LLMProvider.OPENAI, temperature=0.3)
+        return create_llm(provider=LLMProvider.OPENAI)
     elif os.getenv("OLLAMA_MODEL") or os.getenv("OLLAMA_BASE_URL"):
         print("Using Ollama (local)")
-        return create_llm(provider=LLMProvider.OLLAMA, temperature=0.3)
+        return create_llm(provider=LLMProvider.OLLAMA)
     elif os.getenv("LMSTUDIO_BASE_URL"):
         print("Using LM Studio (local)")
-        return create_llm(provider=LLMProvider.LMSTUDIO, temperature=0.3)
+        return create_llm(provider=LLMProvider.LMSTUDIO)
     else:
         print("No cloud API keys found. Trying Ollama with default settings...")
-        return create_llm(provider=LLMProvider.OLLAMA, temperature=0.3)
+        return create_llm(provider=LLMProvider.OLLAMA)
 
 
 async def example_9_multi_turn_requirements() -> None:
@@ -572,7 +572,7 @@ async def example_9_multi_turn_requirements() -> None:
     session = load_session(output_base)
     
     if session:
-        print(f"✓ Loaded existing session with {len(session.iterations)} iterations")
+        print(f"[OK] Loaded existing session with {len(session.iterations)} iterations")
         print(f"  Created: {session.created_at}")
         print(f"  Last updated: {session.updated_at}")
         
@@ -580,7 +580,7 @@ async def example_9_multi_turn_requirements() -> None:
         from solar_flare import merge_requirements
         added = merge_requirements(session, requirements)
         if added:
-            print(f"  ✓ Merged {len(added)} new requirement(s): {[r.id for r in added]}")
+            print(f"  [OK] Merged {len(added)} new requirement(s): {[r.id for r in added]}")
             save_session(session, output_base)
     else:
         print("Creating new session...")
@@ -589,7 +589,7 @@ async def example_9_multi_turn_requirements() -> None:
             requirements=requirements,
             metadata={"platform": "Infineon AURIX TC397", "rtos": "AUTOSAR OS"},
         )
-        print(f"✓ Created new session with {len(requirements)} requirements")
+        print(f"[OK] Created new session with {len(requirements)} requirements")
 
     # Show requirements
     print("\nRequirements tracked:")
@@ -679,7 +679,7 @@ async def example_9_multi_turn_requirements() -> None:
     # Export iteration results
     iter_dir = output_base / f"iteration_{next_iter_id}"
     files = export_workflow_results(result, iter_dir)
-    print(f"  ✓ Exported {len(files)} files to {iter_dir}")
+    print(f"  [OK] Exported {len(files)} files to {iter_dir}")
 
     # =========================================================
     # Update session state
@@ -691,7 +691,7 @@ async def example_9_multi_turn_requirements() -> None:
         phase=result.get("current_phase", "complete"),
         output_dir=f"iteration_{next_iter_id}",
     )
-    print(f"  ✓ Recorded iteration {iteration.iteration_id}")
+    print(f"  [OK] Recorded iteration {iteration.iteration_id}")
 
     # Add traceability entries
     if next_iter_id == 1:
@@ -713,11 +713,11 @@ async def example_9_multi_turn_requirements() -> None:
 
     agents = [w.agent_name for w in worker_results]
     add_trace_entries(session, next_iter_id, req_ids, phase, agents, status)
-    print(f"  ✓ Added {len(req_ids)} traceability entries")
+    print(f"  [OK] Added {len(req_ids)} traceability entries")
 
     # Save session
     save_session(session, output_base)
-    print(f"  ✓ Session saved")
+    print(f"  [OK] Session saved")
 
     # =========================================================
     # Generate updated traceability report
@@ -729,13 +729,13 @@ async def example_9_multi_turn_requirements() -> None:
     trace_report = generate_persistent_traceability_report(session)
     trace_file = output_base / "traceability_matrix.md"
     trace_file.write_text(trace_report, encoding="utf-8")
-    print(f"  ✓ Traceability matrix: {trace_file}")
+    print(f"  [OK] Traceability matrix: {trace_file}")
 
     # Generate session summary
     summary = generate_session_summary(session)
     summary_file = output_base / "session_summary.md"
     summary_file.write_text(summary, encoding="utf-8")
-    print(f"  ✓ Session summary: {summary_file}")
+    print(f"  [OK] Session summary: {summary_file}")
 
     # =========================================================
     # Summary
@@ -756,7 +756,7 @@ async def example_9_multi_turn_requirements() -> None:
         else:
             print(f"  {item.name}")
     
-    print(f"\n💡 Run this example again to add iteration {next_iter_id + 1}")
+    print(f"\n[TIP] Run this example again to add iteration {next_iter_id + 1}")
 
 
 def generate_persistent_traceability_report(session) -> str:

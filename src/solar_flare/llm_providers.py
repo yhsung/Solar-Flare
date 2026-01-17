@@ -101,13 +101,11 @@ def create_llm(
             )
 
     # Get temperature from env if using default
-    if temperature == 0.3:  # Check if using default
-        env_temp = os.getenv("LLM_TEMPERATURE")
-        if env_temp is not None:
-            try:
-                temperature = float(env_temp)
-            except ValueError:
-                pass  # Use default if invalid
+    env_temp = os.getenv("LLM_TEMPERATURE", "0.3")
+    try:
+        temperature = float(env_temp)
+    except ValueError:
+        pass  # Use default if invalid
 
     # Get default model if not specified
     if model is None:
