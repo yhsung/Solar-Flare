@@ -191,6 +191,44 @@ def create_session(
     )
 
 
+def merge_requirements(
+    state: SessionState,
+    new_requirements: List[Dict[str, Any]],
+) -> List[RequirementDef]:
+    """
+    Merge new requirements into an existing session.
+
+    Only adds requirements with IDs that don't already exist in the session.
+
+    Args:
+        state: Current session state
+        new_requirements: List of requirement definitions to merge
+
+    Returns:
+        List of newly added RequirementDef objects
+    """
+    existing_ids = {req.id for req in state.requirements}
+    added = []
+
+    for r in new_requirements:
+        req_id = r.get("id", "")
+        if req_id and req_id not in existing_ids:
+            new_req = RequirementDef(
+                id=req_id,
+                title=r.get("title", ""),
+                description=r.get("description", ""),
+                priority=r.get("priority", "medium"),
+                asil_level=r.get("asil_level", "QM"),
+            )
+            state.requirements.append(new_req)
+            existing_ids.add(req_id)
+            added.append(new_req)
+
+    if added:
+        state.updated_at = _now_with_tz()
+
+    return added
+
 def load_session(session_dir: Union[str, Path]) -> Optional[SessionState]:
     """
     Load session state from a directory.

@@ -529,40 +529,54 @@ async def example_9_multi_turn_requirements() -> None:
     # =========================================================
     # Load or create session
     # =========================================================
+    
+    # Define all requirements (including any new ones)
+    requirements = [
+        {
+            "id": "REQ-001",
+            "title": "Ring Buffer Design",
+            "description": "Design a lock-free ring buffer for multi-core logging",
+            "priority": "high",
+            "asil_level": "ASIL-D",
+        },
+        {
+            "id": "REQ-002",
+            "title": "DMA Transport",
+            "description": "Implement DMA-based log transport with zero-copy semantics",
+            "priority": "high",
+            "asil_level": "ASIL-D",
+        },
+        {
+            "id": "REQ-003",
+            "title": "Overflow Handling",
+            "description": "Handle buffer overflow with configurable policies",
+            "priority": "medium",
+            "asil_level": "ASIL-B",
+        },
+        {
+            "id": "REQ-004",
+            "title": "Boot log collection",
+            "description": "Collect boot log from multiple domains / xPUs / ECUs",
+            "priority": "high",
+            "asil_level": "QM",
+        },
+    ]
+    
     session = load_session(output_base)
     
     if session:
         print(f"✓ Loaded existing session with {len(session.iterations)} iterations")
         print(f"  Created: {session.created_at}")
         print(f"  Last updated: {session.updated_at}")
+        
+        # Merge any new requirements into the existing session
+        from solar_flare import merge_requirements
+        added = merge_requirements(session, requirements)
+        if added:
+            print(f"  ✓ Merged {len(added)} new requirement(s): {[r.id for r in added]}")
+            save_session(session, output_base)
     else:
         print("Creating new session...")
-        
-        # Define requirements for new session
-        requirements = [
-            {
-                "id": "REQ-001",
-                "title": "Ring Buffer Design",
-                "description": "Design a lock-free ring buffer for multi-core logging",
-                "priority": "high",
-                "asil_level": "ASIL-D",
-            },
-            {
-                "id": "REQ-002",
-                "title": "DMA Transport",
-                "description": "Implement DMA-based log transport with zero-copy semantics",
-                "priority": "high",
-                "asil_level": "ASIL-D",
-            },
-            {
-                "id": "REQ-003",
-                "title": "Overflow Handling",
-                "description": "Handle buffer overflow with configurable policies",
-                "priority": "medium",
-                "asil_level": "ASIL-B",
-            },
-        ]
-        
         session = create_session(
             session_id=session_id,
             requirements=requirements,

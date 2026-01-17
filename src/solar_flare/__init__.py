@@ -39,6 +39,7 @@ from solar_flare.session_state import (
     append_iteration,
     revise_iteration,
     add_trace_entries,
+    merge_requirements,
 )
 
 __all__ = [
@@ -69,6 +70,7 @@ __all__ = [
     "append_iteration",
     "revise_iteration",
     "add_trace_entries",
+    "merge_requirements",
 ]
 
 
